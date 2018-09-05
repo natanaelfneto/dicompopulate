@@ -8,7 +8,7 @@ for root, dirs, files in os.walk('/PACS/'):
         for file in files:
             file_path = os.path.abspath(os.path.join(root, file))
             print("Sending "+file_path)
-            command = "dcmsnd DCM4CHEE@10.3.224.22:11112 "+file_path
+            command = "sh ./dcm4chee-2.0.29/bin/dcmsnd DCM4CHEE@10.3.224.22:11112 "+file_path
             os.system(command)
             break
 
