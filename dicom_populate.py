@@ -3,7 +3,7 @@ import os
 files = []
 i = 0
 
-for root, dirs, files in os.walk('D:/PACS/'):
+for root, dirs, files in os.walk('/PACS/'):
     if files:
         for file in files:
             file_path = os.path.abspath(os.path.join(root, file))
