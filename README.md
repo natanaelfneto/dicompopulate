@@ -1,6 +1,6 @@
 <p align="left">
   <a href="#">
-    <img alt="dicom-populate-python-script-logo" src="https://raw.githubusercontent.com/natanaelfneto/.png" width="240"/>
+    <img alt="dicom-populate-python-script-logo" src="https://raw.githubusercontent.com/natanaelfneto/dicom_populate/master/dicom_populate.png" width="240"/>
   </a>
 </p>
 
@@ -19,7 +19,7 @@ Version: **0.0.1**
 _installation is still under development, to make it work_
 _clone or download the repository at_
 ```Shell
-git clone https://github.com/natanaelfneto/.git;
+git clone https://github.com/natanaelfneto/dicom_populate.git
 ```
 _run the command as examplified:
 ```Shell
