@@ -4,13 +4,13 @@ import  argparse, datetime, os, time
 
 st = datetime.datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d %H:%M:%S")
 
-parser = argparse.ArgumentParser(description='A DCM4CHEE usage with python script')
-parser.add_argument('-p','--path', help='DICOM folder path', required=True, default="check_string_for_empty")
-parser.add_argument('-c','--pacs', help='AE Title of destination PACS', required=True, default="check_string_for_empty")
-parser.add_argument('-a','--address', help='IP address of destination PACS', required=True, default="check_string_for_empty")
-parser.add_argument('-P','--port', help='Port of destination PACS', required=True, default="check_string_for_empty")
-parser.add_argument('-v','--verbose', action='store_true', help='Process verbose flag', required=False)
-parser.add_argument('-l','--log', action='store_true', help='Save log file', required=False)
+parser = argparse.ArgumentParser(description='a DCM4CHEE binaries usage with python scripting')
+parser.add_argument('-p','--path', help='dicom folder path', required=True, default="check_string_for_empty")
+parser.add_argument('-c','--pacs', help='ae title of destination PACS', required=True, default="check_string_for_empty")
+parser.add_argument('-a','--address', help='ip address of destination PACS', required=True, default="check_string_for_empty")
+parser.add_argument('-P','--port', help='port of destination PACS', required=True, default="check_string_for_empty")
+parser.add_argument('-v','--verbose', action='store_true', help='process verbose flag', required=False)
+parser.add_argument('-l','--log', action='store_true', help='save log file', required=False)
 args = parser.parse_args()
 
 if args.log:
@@ -48,4 +48,4 @@ for root, dirs, files in os.walk(args.path):
             os.system(command)
 if args.verbose:
     print("",end='\n')
-    print(st+" "+"Finished. \n The log file output can be found at "+os.getcwd()+"/dicom_populate.log.")
+    print(st+" "+"Finished. \n The log file can be found at "+os.getcwd()+"/dicom_populate.log.")
