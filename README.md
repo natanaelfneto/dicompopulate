@@ -17,11 +17,11 @@ Version: **0.0.1**
 ### Via Bash
 #### Installation Process
 _installation is still under development, to make it work_
-_clone or download the repository at_
+_clone or download the repository at:_
 ```Shell
 git clone https://github.com/natanaelfneto/dicom_populate.git
 ```
-_run the command as examplified:
+_run the command as examplified:_
 ```Shell
 python dicom_populate.py --path /PACS/ --pacs DCM4CHEE --address 10.0.0.1 --port 11112
 ```
