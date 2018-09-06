@@ -28,7 +28,7 @@ python dicom_populate.py --path /PACS/ --pacs DCM4CHEE --address 10.0.0.1 --port
 _enjoy_
 ***
 ## Usage
-_this messagem can also be found with_ **python ./.py -h** _command_
+_this messagem can also be found with_ **python dicom_populate.py -h** _command_
 ```ShellSession
 usage: dicom_populate.py [-h] -p PATH -c PACS -a ADDRESS -P PORT [-v] [-l]
 
