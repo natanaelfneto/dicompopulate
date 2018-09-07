@@ -1,6 +1,6 @@
 <p align="left">
   <a href="#">
-    <img alt="dicom-populate-python-script-logo" src="https://raw.githubusercontent.com/natanaelfneto/dicom_populate/master/dicom_populate.png" width="240"/>
+    <img alt="dicom-populate-python-script-logo" src="https://raw.githubusercontent.com/natanaelfneto/dicom_populate/master/dp-logo.png" width="240"/>
   </a>
 </p>
 
