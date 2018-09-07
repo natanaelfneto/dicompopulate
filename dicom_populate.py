@@ -47,7 +47,7 @@ for root, dirs, files in os.walk(args.path):
             # set command for dcm4chee binary
             command = "sh ./dcm4chee-2.0.29/bin/dcmsnd "+ssh+" "+file_path
             i = i+1
-            output = "Sending "+i+": "+file_path
+            output = "Sending "+str(i)+": "+file_path
             if args.log:
                 f.write(output+"\n")
             if args.verbose:
