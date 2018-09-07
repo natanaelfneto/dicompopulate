@@ -14,14 +14,17 @@ parser.add_argument('-v','--verbose', action='store_true', help='process verbose
 parser.add_argument('-l','--log', action='store_true', help='save log file', required=False)
 # add arguments on array
 args = parser.parse_args()
-log = 'populate.log'
+log_instance = 0
+log = "populate_"+str(log_instance)+".log"
+dmc_log = "dcm.log"
 
 # check log flag
 if args.log:
     # check if log file already exist
-    if os.path.isfile(os.getcwd()+log):
-        f = open(log,'a')
-    else:
+    while os.path.isfile(os.getcwd()+"/"+log):
+        log_instance = log_instance + 1
+        log = "populate_"+str(log_instance)+".log"
+    if not os.path.isfile(os.getcwd()+"/"+log):
         f = open(log,'w')
         f.write(st+" Starting log file\n")
 
@@ -45,18 +48,18 @@ for root, dirs, files in os.walk(args.path):
             # get absolute path
             file_path = os.path.abspath(os.path.join(root, file))
             # set command for dcm4chee binary
-            command = "sh ./dcm4chee-2.0.29/bin/dcmsnd "+ssh+" "+file_path
-            i = i+1
-            output = "Sending "+str(i)+": "+file_path
+            command = "nohup sh ./dcm4chee-2.0.29/bin/dcmsnd "+ssh+" "+file_path+" </dev/null> "+dmc_log+" 2>&1 &"
+            i = i + 1
+            output = st+" Sending "+str(i)+": "+file_path
             if args.log:
                 f.write(output+"\n")
             if args.verbose:
-                print(st+" "+output, end='\n')
+                print(output, end='\n')
             else:
-                print(st+" "+output, end='\r')
+                print(output, end='\r')
             # run the command
             os.system(command)
+print("",end='\n')
 if args.verbose:
-    print("",end='\n')
-    print(st+" "+"Finished. \n The log file can be found at "+os.getcwd()+log)
+    print("Log file merged. \n"+st+" "+"Process is now finished. \n The log file can be found at "+os.getcwd()+outlog)
 # finish
