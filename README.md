@@ -7,13 +7,14 @@
   </a>
 </p>
 
-**DICOM Populate** was based on the DCM4CHEE binaries do send folders of dicom files to a PACS
-Version: **0.0.1**
+**DICOM Populate** is small code to send folders of dicom files to many desired PACS server receivers
+Version: **0.3**
 ***
 # Table of Contents
 * [Getting Started](#getting-started)
     * [Installation process](#installation-process)
     * [Usage](#usage)
+    * [TODO](#TODO)
 * [License](#license)
 ***
 ## Getting Started
@@ -26,25 +27,25 @@ git clone https://github.com/natanaelfneto/dicom_populate.git
 ```
 _run the command as examplified:_
 ```Shell
-python dicom_populate.py --path /PACS/ --pacs DCM4CHEE --address 10.0.0.1 --port 11112
+python main.py --paths /PACS/1/ /PACS/2/ /PACS/3/ --conections DCM4CHEE@10.0.0.1:11112 OTHER@127.0.0.1:5555
 ```
 _enjoy_
 ***
+## TODO
+* add _'localhost'_, _'pacs.example.com'_, names support insted or just pure IP Addresses
 ## Usage
 _this messagem can also be found with_ **python dicom_populate.py -h** _command_
 ```ShellSession
-usage: dicom_populate.py [-h] -p PATH -c PACS -a ADDRESS -P PORT [-v] [-l]
+usage: main.py [-h] -p PATHS [PATHS ...] -c CONECTIONS [CONECTIONS ...] [-d] [-v]
 
-A DCM4CHEE usage with python script
+a sender for folders of dicom files in python
 
 optional arguments:
-  -h, --help                        show this help message and exit
-  -p PATH, --path PATH              dicom folder path
-  -c PACS, --pacs PACS              ae title of destination PACS
-  -a ADDRESS, --address ADDRESS     ip address of destination PACS
-  -P PORT, --port PORT              port of destination PACS
-  -v, --verbose                     process verbose flag
-  -l, --log                         save log file
+  -h, --help                                                                  show this help message and exit
+  -p PATHS [PATHS ...], --paths PATHS [PATHS ...]                             dicom folders or files paths
+  -c CONECTIONS [CONECTIONS ...], --conections CONECTIONS [CONECTIONS ...]    the conection parameters for dicom receivers
+  -d, --debug                                                                 process debug flag
+  -v, --verbose                                                               runtime verbose flag
 ```
 ## License
 MIT License
