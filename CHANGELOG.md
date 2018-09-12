@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Released]
 
+### 0.4 - 2018-09-12
+#### Changed
+- changed logger routines to separated class Logger
+
+#### Added
+- added verbose flag
+- added separated verbose and debug outputs but still available for combination of flags
+
 ### 0.3 - 2018-09-09
 #### Changed
 - renamed run.py to main.py
