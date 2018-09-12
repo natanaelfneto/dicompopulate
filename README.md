@@ -2,13 +2,13 @@
   <a href="#">
     <img 
       alt="dicom-populate-python-script-logo" 
-      src="https://raw.githubusercontent.com/natanaelfneto/dicom_populate/master/assets/dp-logo.png" 
+      src="https://raw.githubusercontent.com/natanaelfneto/dicompopulate/master/assets/dp-logo.png" 
       width="240" />
   </a>
 </p>
 
-**DICOM Populate** is small code to send folders of dicom files to many desired PACS server receivers
-Version: **0.3**
+**DICOM Populate** is small code to send folders of dicom files to as many desired PACS server receivers as possible
+Version: **0.4**
 ***
 # Table of Contents
 * [Getting Started](#getting-started)
@@ -20,32 +20,67 @@ Version: **0.3**
 ## Getting Started
 ### Via Bash
 #### Installation Process
-_installation is still under development, to make it work_
-_clone or download the repository at:_
+* Via pip
 ```Shell
-git clone https://github.com/natanaelfneto/dicom_populate.git
+pip install dicompopulate
 ```
-_run the command as examplified:_
+* Via Git
+Clone or download the repository at:\
 ```Shell
-python main.py --paths /PACS/1/ /PACS/2/ /PACS/3/ --conections DCM4CHEE@10.0.0.1:11112 OTHER@127.0.0.1:5555
+git clone https://github.com/natanaelfneto/dicompopulate.git
 ```
 _enjoy_
 ***
 ## TODO
 * add _'localhost'_, _'pacs.example.com'_, names support insted or just pure IP Addresses
+* fully migrate to python 3 standards
+* replace dcm4chee dcmsnd java binary to the python pynetdicom3 library
 ## Usage
-_this messagem can also be found with_ **python dicom_populate.py -h** _command_
+_this messagem can also be found with_ **python populate.py -h** _command_
 ```ShellSession
-usage: main.py [-h] -p PATHS [PATHS ...] -c CONECTIONS [CONECTIONS ...] [-d] [-v]
+usage: populate.py [-h] -p PATHS [PATHS ...] -c CONECTIONS [CONECTIONS ...]  [-d] [-v] [--verbose]
 
-a sender for folders of dicom files in python
+a script to populate a PACS with folder of DICOM files
 
 optional arguments:
-  -h, --help                                                                  show this help message and exit
-  -p PATHS [PATHS ...], --paths PATHS [PATHS ...]                             dicom folders or files paths
-  -c CONECTIONS [CONECTIONS ...], --conections CONECTIONS [CONECTIONS ...]    the conection parameters for dicom receivers
-  -d, --debug                                                                 process debug flag
-  -v, --verbose                                                               runtime verbose flag
+
+-h, --help                                                                  show this help message and exit
+-p PATHS [PATHS ...], --paths PATHS [PATHS ...]                             dicom folders or files paths
+-c CONECTIONS [CONECTIONS ...], --conections CONECTIONS [CONECTIONS ...]    the conection parameters for dicom receivers
+-d, --debug                                                                 process debug flag (it only shows debug information
+                                                                            and can be combined with  the verbose flag for a
+                                                                            more robust output and log)
+-v, --version                                                               output software version
+--verbose                                                                   make output info more verbose (it only shows
+                                                                            output information and can be combined with debug
+                                                                            flag for a more robust output and log)
+```
+## Examples
+### As terminal command
+to run the command as examplified:
+```Shell
+python populate.py --paths /PACS/1/ /PACS/2/ /PACS/3/dicom.dcm --conections DCM4CHEE@10.0.0.1:11112 OTHER@127.0.0.1:5555
+```
+### As python module
+to use it as module follow the exemple, also available in /examples/exemples1.py
+```Python
+from dicompopulate import populate
+
+# get all files and paths to send
+path_1 = '/PACS/1/'
+path_2 = '/PACS/2/'
+path_3 = '/PACS/3/dicom.dcm'
+
+# get all desired conections to receive
+c_1 = 'DCM4CHEE@10.0.0.1:11112'
+c_2 = 'OTHER@127.0.0.1:5555'
+
+# populate
+populate.run(
+  debug=False,
+  path=[ path_1, path_2, path_3 ],
+  conections=[ c_1, c_2 ]
+)
 ```
 ## License
 MIT License

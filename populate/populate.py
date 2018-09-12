@@ -42,13 +42,9 @@ class Populate(object):
     def __init__(self, logger):
         ''' 
             Initiate a DICOM Populate instance.
-            
-            Arguments for send():
-                files: Array of files and/or folder to be sent to a PACS environment
-                conection: Parameters for sending DICOM files
-                    conection.aet: Application Entity Title, the PACS 'given name'
-                    conection.addr: short for address, the IP Address of the server wich is runnig
-                    conection.port: usually 11112 for dicom comunication, but customable
+
+            Argument:
+                logger: a logging instance for output and log
         '''
 
         # setup logger
@@ -58,6 +54,16 @@ class Populate(object):
     # 
     def send(self, paths, conections):
         '''
+            DICOM Populate send function. Get all files inside received paths and
+            send then to PACS environments with especific conections also received
+            from function call
+
+            Arguments:
+                files: Array of files and/or folder to be sent to a PACS environment
+                conection: Parameters for sending DICOM files
+                    conection.aet: Application Entity Title, the PACS 'given name'
+                    conection.addr: short for address, the IP Address of the server wich is runnig
+                    conection.port: usually 11112 for dicom comunication, but customable
         '''
 
         # set basic variable
@@ -122,6 +128,9 @@ class PathsValidity(object):
     def __init__(self, logger):
         ''' 
             Initiate a DICOM Populate Path Validity instance.
+
+            Argument:
+                logger: a logging instance for output and log
         '''
 
         # setup logger
@@ -165,6 +174,9 @@ class ConectionsValidity(object):
     def __init__(self, logger):
         ''' 
             Initiate a DICOM Populate Conection Validity instance.
+
+            Argument:
+                logger: a logging instance for output and log
         '''
 
         # setup logger
@@ -229,6 +241,9 @@ class Logger(object):
     def __init__(self, folder, format, debug_flag, extra, verbose_flag):
         ''' 
             Initiate a DICOM Populate Logger instance.
+
+            Argument:
+                logger: a logging instance for output and log
         '''
 
         # 
@@ -287,16 +302,29 @@ class Logger(object):
         self.verbose_flag = verbose_flag
 
     # function for print info logs on output in case of verbose flag
-    def verbose(self, *message):
+    def verbose(self, message):
         '''
+            Verbose is a DICOM Populate function to check if and flag for verbose
+            was passed and output iformation on each sent files
 
+            Arguments:
+                message: receive output or log message and pass it through only if
+                    the verbose flag is setted
         '''
 
         # check verbose flag and log it
         if self.verbose_flag:
             self.adapter.info(message[0])
 
+# command line argument parser
 def args(args):
+    '''
+        Main function for terminal call of library
+
+        Arguments:
+            args: receive all passed arguments and filter them using
+                the argparser library
+    '''
 
     # argparser init
     parser = argparse.ArgumentParser(
@@ -360,8 +388,25 @@ def args(args):
     # run populate routines
     run(args.debug, args.paths, args.conections, args.verbose)
 
-def run(debug_flag=False, paths=[], conections=[], verbose_flag=False):
+# run script function
+def run(debug=False, paths=[], conections=[], verbose=False):
+    '''
+        Function to be call using library as a module on a script.py type of file
+        or via terminal through the args() function
 
+        Arguments:
+            debug_flag: set the debug output
+            paths: An array of paths os DICOM files
+            conections: parameters for sendind files to PACS environments
+            verbose_flag: sent the output for every file parsed
+    '''
+
+    # normalizing variables
+    debug_flag = debug
+    verbose_flag = verbose
+
+    # creates a logger instance from class Logger within:
+    # an adapter (the logging library Logger Adapter) and the verbose flag
     logger = Logger(
         folder = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)),'../log/')),
         format = '%(asctime)s --%(levelname)s-- [%(project)s-%(version)s] user: %(user)s LOG: %(message)s',
@@ -400,7 +445,7 @@ def run(debug_flag=False, paths=[], conections=[], verbose_flag=False):
     populate = Populate(logger)
     populate.send(paths, conections)
 
-    # run function on command call
+# main function
 if __name__ == "__main__":
     args(sys.argv[1:])
 # end of code
