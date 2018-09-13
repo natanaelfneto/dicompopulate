@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### 0.4 - 2018-09-12
 #### Changed
 - changed logger routines to separated class Logger
+- added pydicom module for checking if file is dicom valid
+- added proto function to echo validade aet@ip:port conections
 
 #### Added
 - added verbose flag

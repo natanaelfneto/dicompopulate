@@ -36,6 +36,8 @@ import os
 import re
 import sys
 
+from pynetdicom3 import AE
+
 # class for populate application entities
 class Populate(object):
 
@@ -75,6 +77,7 @@ class Populate(object):
         for path in paths:
             # get files inside current path
             self.logger.debug('Looping throug files inside folder and its subfolders...')
+            self.logger.info('Sending files at {0}'.format(path))
 
             for root, dirs, files in os.walk(path):
                 # check if folder is not empty
@@ -106,6 +109,9 @@ class Populate(object):
                                     conection['port'],
                                     file_path
                                 )
+
+                                # Sending file through pynetdicom3 library
+                                # ...
 
                                 # log successfully file transmition
                                 self.verbose(output)
@@ -191,8 +197,53 @@ class ConectionsValidity(object):
 
         '''
 
+        # ae status flag
+        echo_status = False
+
+        # output message
+        output = "AE: {0}, IP: {1}, PORT: {2}".format(title, addr, str(port))
+        self.logger.info('Trying C-ECHO at {0}'.format(output))
+
+        # instance of AE for parsed title
+        ae = AE(ae_title=str(title))
+
+        '''
+            Verification SOP Class has a UID of 1.2.840.10008.1.1
+            we can use the UID string directly when requesting the presentation
+            contexts we want to use in the association
+        '''
+        ae.add_requested_context('1.2.840.10008.1.1')
+
+        # associate with the peer AE
+        self.logger.debug('Requesting Association with the peer for {0}'.format(output))
+        assoc = ae.associate(addr, port, ae_title=str(title))
+
+        # check association
+        if assoc.is_established:
+            '''
+                Send a DIMSE C-ECHO request to the peer
+                status is a pydicom Dataset object with (at a minimum) a
+                (0000, 0900) Status element
+            '''
+            self.logger.debug('Association accepted by the peer')
+
+            # get association status
+            status = assoc.send_c_echo()
+
+            # output the response from the peer
+            if status:
+                echo_status = True
+                self.logger.info('C-ECHO at {0} returned STATUS: 0x{1:04x}'.format(output, status.Status))
+
+            # Release the association
+            assoc.release()
+        elif assoc.is_rejected:
+            self.logger.debug('Association was rejected by the peer')
+        elif assoc.is_aborted:
+            self.logger.debug('Received an A-ABORT from the peer during Association')
+
         # return flag for successfuly echo
-        return True
+        return echo_status
 
     # conection validity checker function
     def validate(self, conections):
@@ -223,6 +274,9 @@ class ConectionsValidity(object):
                 # get TCP/IP Port format
                 port = conection.split('@')[1].split(':')[1]
 
+                # output message
+                output = "AE: {0}, IP: {1}, PORT: {2}".format(title, addr, str(port))
+
                 # check if ae_title, address and port are in correct format
                 if not re.match(r"^\w+$",title):
                     self.logger.debug('Wrong conection AE Title was passed: %s', title)
@@ -232,24 +286,24 @@ class ConectionsValidity(object):
                     self.logger.debug('Wrong conection TCP/IP Address was passed: %s', addr)
 
                 # 
-                elif not re.match(r"^\d{2,5}$",port):
+                elif not re.match(r"^\d{2,5}$",port) and int(port):
                     self.logger.debug('Wrong conection TCP/IP Port was passed: %s', port)
 
                 # 
-                elif self.echo(title, addr, port):
+                elif self.echo(title, addr, int(port)):
                     valid_aes.append({
                         'title': title,
                         'addr': addr,
-                        'port': port
+                        'port': int(port)
                     })
 
-                # 
+                #
                 else:
-                    self.logger.debug(
-                        "Application Entity Titled: {0}, \
-                        with IP: {1}, PORT: {2} \
-                        cound not be reached".format(title, addr, port)
-                        )
+                    # output message
+                    message = "{0} cound not be reached".format(output)
+
+                    # log message
+                    self.logger.debug(message)
 
         # return valid parameters for application entities
         return valid_aes
@@ -285,6 +339,9 @@ class Logger(object):
         # set log name
         logger = logging.getLogger(__project__+'-'+__version__)
 
+        # set formatter
+        formatter = logging.Formatter(log['format'])
+
         # check debug flag
         if debug_flag:
             logger.setLevel('DEBUG')
@@ -300,23 +357,20 @@ class Logger(object):
             except Exception  as e:
                 print("Log folder:",log['folder'],"could not be created, error:", e)
 
-        # setup of handlers
-        handler = logging.FileHandler(log['filepath'])        
-        handler.setFormatter(logging.Formatter(log['format']))
+        # setup of file handler
+        file_handler = logging.FileHandler(log['filepath'])     
+        file_handler.setFormatter(formatter)
+
+        # setup of stream handler
+        stream_handler = logging.StreamHandler()
+        stream_handler.setFormatter(formatter)
 
         # add handler to the logger
-        logger.addHandler(handler)
+        logger.addHandler(file_handler)
+        logger.addHandler(stream_handler)
 
         # update logger to receive formatter within extra data
         logger = logging.LoggerAdapter(logger, log['extra'])
-
-        # parsinf logging basic config
-        logging.basicConfig(
-            level=getattr(logging,log['level']),
-            format=log['format'],
-            datefmt=log['date_format'],
-            filemode='w+'
-        )
 
         self.adapter = logger
         self.verbose_flag = verbose_flag
@@ -429,7 +483,7 @@ def run(debug=False, paths=[], conections=[], verbose=False):
     # an adapter (the logging library Logger Adapter) and the verbose flag
     logger = Logger(
         folder = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)),'../log/')),
-        format = '%(asctime)s --%(levelname)s-- [%(project)s-%(version)s] user: %(user)s LOG: %(message)s',
+        format = '%(asctime)-8s %(levelname)-5s [%(project)s-%(version)s] user: %(user)s LOG: %(message)s',
         debug_flag = debug_flag,
         extra = {
             'project':  __project__,
@@ -448,7 +502,8 @@ def run(debug=False, paths=[], conections=[], verbose=False):
         logger.adapter.error('No paths were successfully parsed. Exiting...')
         sys.exit()
     else:
-        logger.adapter.info('Paths were successfully parsed')
+        logger.adapter.info('Some path(s) were successfully parsed')
+        logger.adapter.debug('Path(s):{0}'.format(paths))
 
     # check validity of the paths parsed
     conections_validator = ConectionsValidity(logger)
@@ -459,7 +514,8 @@ def run(debug=False, paths=[], conections=[], verbose=False):
         logger.adapter.error('No conections were successfully parsed. Exiting...')
         sys.exit()
     else:
-        logger.adapter.info('Conections were successfully parsed')
+        logger.adapter.info('Some conection(s) were successfully parsed')
+        logger.adapter.debug('Conection(s):{0}'.format(conections))
 
     # populate pacs servers with given folders dicom files
     populate = Populate(logger)

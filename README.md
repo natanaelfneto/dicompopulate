@@ -13,6 +13,7 @@ Version: **0.4**
 # Table of Contents
 * [Getting Started](#getting-started)
     * [Installation process](#installation-process)
+    * [Dependencies](#dependencies)
     * [Usage](#usage)
     * [TODO](#TODO)
 * [License](#license)
@@ -31,6 +32,9 @@ git clone https://github.com/natanaelfneto/dicompopulate.git
 ```
 _enjoy_
 ***
+### Dependencies
+- pydicom
+- pynetdicom
 ## TODO
 * add _'localhost'_, _'pacs.example.com'_, names support insted or just pure IP Addresses
 * fully migrate to python 3 standards
