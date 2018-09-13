@@ -31,6 +31,7 @@ short_description = "a script to populate a PACS with folder of DICOM files"
 import argparse
 import getpass
 import logging
+import pydicom
 import os
 import re
 import sys
@@ -74,6 +75,7 @@ class Populate(object):
         for path in paths:
             # get files inside current path
             self.logger.debug('Looping throug files inside folder and its subfolders...')
+
             for root, dirs, files in os.walk(path):
                 # check if folder is not empty
                 if files:
@@ -83,43 +85,45 @@ class Populate(object):
                         # get absolute path
                         file_path = os.path.abspath(os.path.join(root, file))
 
-                        # increment file counter
-                        i = i + 1
+                        # check if file can be parsed as dicom
+                        try:
+                            dcmfile = pydicom.dcmread(file_path, force=True)
+                        except Exception as e:
+                            self.logger.debug("Could not parse {0} as a DICOM file".format(file_path))
+                            continue
 
                         # send file to each available conection
                         for conection in conections:
                             try:
-                                # log successfully file transmition
-                                self.verbose(
-                                    "Sendind file: {0} AE: {1} IP: {2} PORT: {3} PATH: {4}".format(
+                                # increment file counter
+                                i = i + 1
+
+                                # output message
+                                output = "File No. {0}, AE: {1}, IP: {2}, PORT: {3}, PATH: {4}".format(
                                     str(i),
                                     conection['title'],
                                     conection['addr'],
                                     conection['port'],
                                     file_path
-                                    )
                                 )
+
+                                # log successfully file transmition
+                                self.verbose(output)
+                            
+                            # exception catcher
                             except Exception as e:
-                                self.error(
-                                    "Error while sendind file: {0} AE: {1} IP: {2} PORT: {3} PATH: {4} ERROR: {5}".format(
-                                    str(i),
-                                    conection['title'],
-                                    conection['addr'],
-                                    conection['port'],
-                                    file_path,
-                                    e
-                                    )
-                                )
+                                self.logger.error("Error while sendin:g {0} ERROR: {1}".format(output, e))
+
                 # if no files were found inside folder
                 else:
                     root = os.path.abspath(os.path.join(root)) 
-                    self.logger.debug('No file found inside this folder %s', root)
-            
+                    self.logger.debug('No dicom files were found within this folder %s', root)
+
             # log finishing all current path files
-            self.logger.info('Finished sending all files from %s', path)
+            self.logger.info('Finished loop at %s', path)
 
         # log finishing all parsed paths
-        self.logger.info('Finished sending all files')
+        self.logger.info('Finished all loops for files. A total of {0} were sucessfully sent'.format(str(i)))
 
 # class for paths argument parser
 class PathsValidity(object):
@@ -182,6 +186,14 @@ class ConectionsValidity(object):
         # setup logger
         self.logger = logger.adapter
 
+    def echo(self, title, addr, port):
+        '''
+
+        '''
+
+        # return flag for successfuly echo
+        return True
+
     # conection validity checker function
     def validate(self, conections):
         '''
@@ -220,16 +232,24 @@ class ConectionsValidity(object):
                     self.logger.debug('Wrong conection TCP/IP Address was passed: %s', addr)
 
                 # 
-                elif not re.match(r"^\d{4,5}$",port):
+                elif not re.match(r"^\d{2,5}$",port):
                     self.logger.debug('Wrong conection TCP/IP Port was passed: %s', port)
 
                 # 
-                else:
+                elif self.echo(title, addr, port):
                     valid_aes.append({
                         'title': title,
                         'addr': addr,
                         'port': port
                     })
+
+                # 
+                else:
+                    self.logger.debug(
+                        "Application Entity Titled: {0}, \
+                        with IP: {1}, PORT: {2} \
+                        cound not be reached".format(title, addr, port)
+                        )
 
         # return valid parameters for application entities
         return valid_aes
@@ -314,7 +334,7 @@ class Logger(object):
 
         # check verbose flag and log it
         if self.verbose_flag:
-            self.adapter.info(message[0])
+            self.adapter.info(message)
 
 # command line argument parser
 def args(args):

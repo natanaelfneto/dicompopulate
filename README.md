@@ -57,14 +57,14 @@ optional arguments:
 ```
 ## Examples
 ### As terminal command
-to run the command as examplified:
+to run it as command:
 ```Shell
 python populate.py --paths /PACS/1/ /PACS/2/ /PACS/3/dicom.dcm --conections DCM4CHEE@10.0.0.1:11112 OTHER@127.0.0.1:5555
 ```
 ### As python module
-to use it as module follow the exemple, also available in /examples/exemples1.py
+to use it as module follow the exemple, also available in populate/examples/exemple1.py
 ```Python
-from dicompopulate import populate
+from populate import populate
 
 # get all files and paths to send
 path_1 = '/PACS/1/'

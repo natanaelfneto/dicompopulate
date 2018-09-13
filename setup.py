@@ -1,12 +1,18 @@
 #!/usr/bin/env python
 from __future__ import print_function
+
 from populate import populate as module
 import re
 import setuptools
 
 # project long description
-with open("README.md", "r") as file:
+BASE_PATH = os.path.abspath(os.path.dirname(__file__))
+with open(os.path.join(BASE_PATH, 'README.md'), "r") as file:
     long_description = file.read()
+
+install_requires=[
+   'pydicom',
+]
 
 setuptools.setup(
     name=module.__project__,
