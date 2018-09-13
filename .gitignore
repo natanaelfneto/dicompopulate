@@ -5,6 +5,7 @@
 modules/*
 log/
 dist/
+*egg-info/
 
 ### Django ###
 *.log

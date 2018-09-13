@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from __future__ import print_function
 
 # project name
 __project__ = "populate"
@@ -169,10 +168,8 @@ class PathsValidity(object):
 
             # if not, log the error
             else:
-                self.logger.debug( \
-                    "Path '%s' could not be found or does not have read permitions, \
-                    therefore will be ignored", path
-                    )
+                output = "Path {0} could not be found or does not have read permitions on, therefore will be ignored".format(path)
+                self.logger.debug(output)
         
         # return all parsed valid paths
         return valid_paths
@@ -352,7 +349,7 @@ class Logger(object):
         if not os.path.exists(log['folder']):
             print("Log folder:",log['folder'],"not found")
             try:
-                os.makedirs(log_folder)
+                os.makedirs(log['folder'])
                 print("Log folder:",log['folder'],"created")
             except Exception  as e:
                 print("Log folder:",log['folder'],"could not be created, error:", e)
@@ -479,11 +476,17 @@ def run(debug=False, paths=[], conections=[], verbose=False):
     debug_flag = debug
     verbose_flag = verbose
 
+    # standard log folder
+    log_folder = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)),'../log/'))
+
+    # standard log format
+    log_format = '%(asctime)-8s %(levelname)-5s [%(project)s-%(version)s] user: %(user)s LOG: %(message)s'
+
     # creates a logger instance from class Logger within:
     # an adapter (the logging library Logger Adapter) and the verbose flag
     logger = Logger(
-        folder = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)),'../log/')),
-        format = '%(asctime)-8s %(levelname)-5s [%(project)s-%(version)s] user: %(user)s LOG: %(message)s',
+        folder = log_folder,
+        format = log_format,
         debug_flag = debug_flag,
         extra = {
             'project':  __project__,
@@ -492,6 +495,9 @@ def run(debug=False, paths=[], conections=[], verbose=False):
         },
         verbose_flag = verbose_flag
     )
+
+    # output log folder location
+    logger.adapter.debug('Log file located at {0}'.format(log_folder))
 
     # check validity of the paths parsed
     path_validator = PathsValidity(logger)

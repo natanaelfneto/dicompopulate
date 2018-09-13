@@ -1,4 +1,4 @@
-from dicompopulate import populate
+from populate import populate
 
 # get all files and paths to send
 path_1 = '/PACS/1/'
@@ -11,7 +11,7 @@ c_2 = 'OTHER@127.0.0.1:5555'
 
 # populate
 populate.run(
-  debug=False,
-  path=[ path_1, path_2, path_3 ],
+  debug=True,
+  paths=[ path_1, path_2, path_3 ],
   conections=[ c_1, c_2 ]
 )

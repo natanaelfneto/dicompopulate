@@ -22,13 +22,16 @@ Version: **0.4**
 ### Via Bash
 #### Installation Process
 * Via pip
+_still not yet available in Pypi repository_
 ```Shell
-pip install dicompopulate
+pip install git+https://github.com/natanaelfneto/dicompopulate.git
 ```
 * Via Git
 Clone or download the repository at:\
 ```Shell
 git clone https://github.com/natanaelfneto/dicompopulate.git
+cd dicompopulate
+python setup.py install
 ```
 _enjoy_
 ***
@@ -49,15 +52,24 @@ a script to populate a PACS with folder of DICOM files
 optional arguments:
 
 -h, --help                                                                  show this help message and exit
--p PATHS [PATHS ...], --paths PATHS [PATHS ...]                             dicom folders or files paths
--c CONECTIONS [CONECTIONS ...], --conections CONECTIONS [CONECTIONS ...]    the conection parameters for dicom receivers
--d, --debug                                                                 process debug flag (it only shows debug information
-                                                                            and can be combined with  the verbose flag for a
-                                                                            more robust output and log)
+
+-p PATHS [PATHS ...], 
+--paths PATHS [PATHS ...]                                                   array of dicom folders or files paths
+
+-c CONECTIONS [CONECTIONS ...],
+--conections CONECTIONS [CONECTIONS ...]                                    array of conection parameters for dicom 
+                                                                            receivers (Application Entities)
+
+-d, --debug                                                                 set debug flag (it only shows debug
+                                                                            information and can be combined with the 
+                                                                            verbose flag for a more robust output and log)
+
 -v, --version                                                               output software version
---verbose                                                                   make output info more verbose (it only shows
-                                                                            output information and can be combined with debug
-                                                                            flag for a more robust output and log)
+
+--verbose                                                                   set verbose flag to enhence output info
+                                                                            (it only shows output information and can
+                                                                            be combined with debug flag for a more
+                                                                            robust output and log)
 ```
 ## Examples
 ### As terminal command

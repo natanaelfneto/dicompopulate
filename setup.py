@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-from __future__ import print_function
 
-from populate import populate as module
+import importlib
+import os
 import re
 import setuptools
 
@@ -10,9 +10,29 @@ BASE_PATH = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(BASE_PATH, 'README.md'), "r") as file:
     long_description = file.read()
 
-install_requires=[
+install_requires = [
    'pydicom',
-]   
+]
+
+github_dependencies = {
+    'pynetdicom3': 'https://github.com/pydicom/pynetdicom3.git'
+}
+
+# install dependencies only available on github repositories
+for dependency in github_dependencies:
+    try:
+        print('check if dependency module {0} is already installed'.format(dependency))
+        i = importlib.import_module(dependency)
+        print('{0} [OK]'.format(dependency))
+    except Exception as e:
+        print('module {0} not found, installing...'.format(dependency))
+        try:
+            os.system('pip install git+{0}'.format(github_dependencies[dependency]))
+        except Exception as e:
+            print('Could not install following dependency: {0}'.format(dependency))
+
+# import own module
+from populate import populate as module
 
 setuptools.setup(
     name=module.__project__,
