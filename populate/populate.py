@@ -35,13 +35,15 @@ import os
 import re
 import sys
 
+from pydicom import read_file
 from pynetdicom3 import AE
+from pynetdicom3 import StoragePresentationContexts
 
 # class for populate application entities
 class Populate(object):
 
     # initialize an instance
-    def __init__(self, logger):
+    def __init__(self):
         ''' 
             Initiate a DICOM Populate instance.
 
@@ -97,27 +99,31 @@ class Populate(object):
                         # send file to each available conection
                         for conection in conections:
                             try:
-                                # increment file counter
-                                i = i + 1
+                                # send file through pynetdicom3 library
+                                if ConectionsValidity().store(conection, file_path):
 
-                                # output message
-                                output = "File No. {0}, AE: {1}, IP: {2}, PORT: {3}, PATH: {4}".format(
-                                    str(i),
-                                    conection['title'],
-                                    conection['addr'],
-                                    conection['port'],
-                                    file_path
-                                )
+                                    # increment file counter
+                                    i = i + 1
 
-                                # Sending file through pynetdicom3 library
-                                # ...
+                                    # output message
+                                    output = "File No. {0}, AE: {1}, IP: {2}, PORT: {3}, PATH: {4}".format(
+                                        str(i),
+                                        conection['title'],
+                                        conection['addr'],
+                                        conection['port'],
+                                        file_path
+                                    )
 
-                                # log successfully file transmition
-                                self.verbose(output)
-                            
+                                    # log successfully file transmition
+                                    self.verbose(output)
+
+                                # file not sent
+                                else:
+                                    self.logger.debug("{0} could not be sent".format(output))
+
                             # exception catcher
                             except Exception as e:
-                                self.logger.error("Error while sendin:g {0} ERROR: {1}".format(output, e))
+                                self.logger.error("Error while sending {0} ERROR: {1}".format(output, e))
 
                 # if no files were found inside folder
                 else:
@@ -128,13 +134,17 @@ class Populate(object):
             self.logger.info('Finished loop at %s', path)
 
         # log finishing all parsed paths
-        self.logger.info('Finished all loops for files. A total of {0} were sucessfully sent'.format(str(i)))
+        self.logger.info('Finished all loops for files. A total of {0} file were sucessfully sent'.format(str(i)))
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        for file in self.files:
+            os.unlink(file)
 
 # class for paths argument parser
 class PathsValidity(object):
 
     # path validity init
-    def __init__(self, logger):
+    def __init__(self):
         ''' 
             Initiate a DICOM Populate Path Validity instance.
 
@@ -174,11 +184,15 @@ class PathsValidity(object):
         # return all parsed valid paths
         return valid_paths
 
+    def __exit__(self, exc_type, exc_value, traceback):
+        for file in self.files:
+            os.unlink(file)
+
 # class for conection argument parser
 class ConectionsValidity(object):
 
     # path validity init
-    def __init__(self, logger):
+    def __init__(self):
         ''' 
             Initiate a DICOM Populate Conection Validity instance.
 
@@ -188,13 +202,14 @@ class ConectionsValidity(object):
 
         # setup logger
         self.logger = logger.adapter
+        self.verbose = logger.verbose
 
     def echo(self, title, addr, port):
         '''
 
         '''
 
-        # ae status flag
+        # ae echo status flag
         echo_status = False
 
         # output message
@@ -224,23 +239,208 @@ class ConectionsValidity(object):
             '''
             self.logger.debug('Association accepted by the peer')
 
-            # get association status
-            status = assoc.send_c_echo()
+            try:
+                # get association status
+                status = assoc.send_c_echo()
 
-            # output the response from the peer
-            if status:
-                echo_status = True
-                self.logger.info('C-ECHO at {0} returned STATUS: 0x{1:04x}'.format(output, status.Status))
+                # output the response from the peer
+                if status:
+                    echo_status = True
+                    self.logger.info('C-ECHO at {0} returned STATUS: 0x{1:04x}'.format(output, status.Status))
+            
+            # 
+            except Exception as e:
+                self.logger.error('C-ECHO at {0} could not return any status. ERROR: {1}'.format(output, e))
 
-            # Release the association
-            assoc.release()
         elif assoc.is_rejected:
             self.logger.debug('Association was rejected by the peer')
         elif assoc.is_aborted:
             self.logger.debug('Received an A-ABORT from the peer during Association')
 
+        # Release the association
+        assoc.release()
+
         # return flag for successfuly echo
         return echo_status
+
+    def store(self, conection, dcmfile):
+
+        # ae store status flag
+        store_status = False
+
+        # output message
+        output = "AE: {0}, IP: {1}, PORT: {2}".format(conection['title'], conection['addr'], str(conection['port']))
+        self.logger.debug('Trying C-STORE dicom file at {0}'.format(output))
+
+        # instance of AE for parsed title
+        ae = AE(ae_title=str(conection['title']))
+
+        '''
+           
+        '''
+        ae.requested_contexts = StoragePresentationContexts
+
+        # associate with the peer AE
+        self.logger.debug('Requesting Association with the peer for {0}'.format(output))
+        assoc = ae.associate(conection['addr'], conection['port'], ae_title=str(conection['title']))
+
+        # check association
+        if assoc.is_established:
+            '''
+                
+            '''
+            self.logger.debug('Association accepted by the peer')
+
+            try:
+                # Read the DICOM dataset from file 'dcmfile'
+                dataset = read_file(dcmfile)               
+
+                # Send a DIMSE C-STORE request to the peer
+                status = assoc.send_c_store(dataset)
+
+                # output the response from the peer
+                if status:
+                    store_status = True
+                    self.logger.debug('C-STORE at {0} returned STATUS: 0x{1:04x}'.format(output, status.Status))
+
+                    # verbose data for success C-STORE of DICOM file
+                    self.retrieve_dataset(dataset) 
+
+            # 
+            except Exception as e:
+                self.logger.error('C-STORE at {0} could not return any status. ERROR: {1}'.format(output, e))
+
+        elif assoc.is_rejected:
+            self.logger.debug('Association was rejected by the peer')
+        elif assoc.is_aborted:
+            self.logger.debug('Received an A-ABORT from the peer during Association')
+
+        # Release the association
+        assoc.release()
+        
+        return store_status
+
+    def retrieve_dataset(self, dataset):
+
+        data = [
+            # 'AccessionNumber',
+            # 'AcquisitionDate',
+            # 'AcquisitionTime', 
+            # 'BitsAllocated', 
+            # 'BitsStored', 
+            # 'CineRate', 
+            # 'Columns', 
+            # 'ContentDate', 
+            # 'ContentTime', 
+            # 'ContrastBolusAgent', 
+            # 'DeviceSerialNumber', 
+            # 'DistanceSourceToDetector', 
+            # 'DistanceSourceToEntrance', 
+            # 'DistanceSourceToPatient', 
+            # 'ExposureTime', 
+            # 'FrameDelay', 
+            # 'FrameIncrementPointer', 
+            # 'FrameTime', 
+            # 'HighBit', 
+            # 'ImageType', 
+            # 'ImagerPixelSpacing', 
+            # 'InstanceCreationTime', 
+            # 'InstanceNumber', 
+            'InstitutionName', 
+            'InstitutionalDepartmentName', 
+            # 'KVP', 
+            # 'Laterality', 
+            # 'LossyImageCompression', 
+            # 'Manufacturer', 
+            # 'ManufacturerModelName', 
+            'Modality', 
+            'NumberOfFrames', 
+            # 'PatientBirthDate', 
+            # 'PatientID', 
+            # 'PatientName', 
+            # 'PatientOrientation', 
+            # 'PatientSex', 
+            # 'PerformedProcedureStepID', 
+            # 'PerformedProcedureStepStartDate', 
+            # 'PerformedProcedureStepStartTime', 
+            # 'PerformingPhysicianName', 
+            # 'PhotometricInterpretation', 
+            # # 'PixelData', 
+            # # 'PixelIntensityRelationship', 
+            # 'PixelRepresentation', 
+            # 'PositionerMotion', 
+            # 'PositionerPrimaryAngle', 
+            # 'PositionerSecondaryAngle', 
+            # 'ProtocolName', 
+            # 'RadiationSetting', 
+            # 'RecommendedDisplayFrameRate', 
+            # 'ReferringPhysicianName', 
+            # 'Rows', 
+            # 'SOPClassUID', 
+            # 'SOPInstanceUID', 
+            # 'SamplesPerPixel', 
+            # 'SeriesDate', 
+            # 'SeriesDescription', 
+            # 'SeriesInstanceUID', 
+            'SeriesNumber', 
+            # 'SeriesTime', 
+            # 'ShutterLeftVerticalEdge', 
+            # 'ShutterLowerHorizontalEdge', 
+            # 'ShutterRightVerticalEdge', 
+            # 'ShutterShape', 
+            # 'ShutterUpperHorizontalEdge', 
+            # 'SoftwareVersions', 
+            # 'StationName', 
+            # 'StudyDate', 
+            # 'StudyDescription', 
+            # 'StudyID', 
+            'StudyInstanceUID', 
+            # 'StudyTime', 
+            # 'TableMotion', 
+            # 'WindowCenter', 
+            # 'WindowWidth', 
+            # 'XRayTubeCurrent', 
+
+            # # '_convert_YBR_to_RGB', 
+            # # '_dataset_slice', 
+            # # '_get_pixel_array', 
+            # # '_is_uncompressed_transfer_syntax', 
+            # # '_pretty_str', 
+            # # '_reshape_pixel_array', 
+            # # '_slice_dataset', 
+
+            # # 'add', 
+            # # 'add_new', 
+            # # 'clear', 
+            # # 'convert_pixel_data', 
+            # # 'copy', 
+            # # 'data_element', 
+            # # 'decode', 
+            # # 'decompress', 
+            # # 'formatted_lines', 
+            # # 'fromkeys', 
+            # # 'group_dataset', 
+            # 'is_original_encoding', 
+            # # 'pixel_array', 
+            # # 'pop', 
+            # # 'popitem', 
+            # # 'remove_private_tags', 
+            # # 'setdefault', 
+            # # 'top', 
+            # # 'trait_names',
+            # # 'values', 
+            # # 'walk'
+        ]
+
+        temp = ''
+        for data_title in data:
+            temp = temp + '\n {0}: {1}'.format(data_title, getattr(dataset, data_title))
+
+        output = 'Retrieve dicom dataset while omitting patient sensitive data \n' +\
+        '\n >> ============================ <<' + temp + '\n'
+
+        # verbose output for success on C-STORE DICOM files
+        self.verbose(output)
 
     # conection validity checker function
     def validate(self, conections):
@@ -304,6 +504,10 @@ class ConectionsValidity(object):
 
         # return valid parameters for application entities
         return valid_aes
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        for file in self.files:
+            os.unlink(file)
 
 # 
 class Logger(object):
@@ -386,6 +590,10 @@ class Logger(object):
         # check verbose flag and log it
         if self.verbose_flag:
             self.adapter.info(message)
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        for file in self.files:
+            os.unlink(file)
 
 # command line argument parser
 def args(args):
@@ -484,6 +692,7 @@ def run(debug=False, paths=[], conections=[], verbose=False):
 
     # creates a logger instance from class Logger within:
     # an adapter (the logging library Logger Adapter) and the verbose flag
+    global logger
     logger = Logger(
         folder = log_folder,
         format = log_format,
@@ -500,7 +709,7 @@ def run(debug=False, paths=[], conections=[], verbose=False):
     logger.adapter.debug('Log file located at {0}'.format(log_folder))
 
     # check validity of the paths parsed
-    path_validator = PathsValidity(logger)
+    path_validator = PathsValidity()
     paths = path_validator.validate(paths)
 
     # check if validate paths remained
@@ -512,7 +721,7 @@ def run(debug=False, paths=[], conections=[], verbose=False):
         logger.adapter.debug('Path(s):{0}'.format(paths))
 
     # check validity of the paths parsed
-    conections_validator = ConectionsValidity(logger)
+    conections_validator = ConectionsValidity()
     conections = conections_validator.validate(conections)
 
     # check if validate conections remained
@@ -524,8 +733,9 @@ def run(debug=False, paths=[], conections=[], verbose=False):
         logger.adapter.debug('Conection(s):{0}'.format(conections))
 
     # populate pacs servers with given folders dicom files
-    populate = Populate(logger)
+    populate = Populate()
     populate.send(paths, conections)
+    sys.exit()
 
 # main function
 if __name__ == "__main__":

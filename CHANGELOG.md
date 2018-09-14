@@ -9,13 +9,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### 0.4 - 2018-09-12
 #### Changed
 - logger routines to separated class Logger
+- change logger from class input to global variable
 
 #### Added
 - verbose flag
 - separated verbose and debug outputs but still available for combination of flags
 - pydicom module for checking if file is dicom valid
 - function to echo validade aet@ip:port conections
-- 
+- function to store dicom to valid aet@ip:port
 
 ### 0.3 - 2018-09-09
 #### Changed
