@@ -22,12 +22,12 @@ Version: **0.4**
 ### Via Bash
 #### Installation Process
 * Via pip\
-_still not yet available in Pypi repository_
+_still not available in Pypi repository_
 ```Shell
 pip install git+https://github.com/natanaelfneto/dicompopulate.git
 ```
-* Via Gitz
-Clone or download the repository at:\
+* Via Git\
+Clone or download the repository at:
 ```Shell
 git clone https://github.com/natanaelfneto/dicompopulate.git
 cd dicompopulate
@@ -44,7 +44,7 @@ _enjoy_
 * make C-STORE better by stop closing conections and reopening for each dicom file sent
 * check if file was save on destination conection (probably with C-FIND)
 ## Usage
-_this messagem can also be found with_ **python populate.py -h** _command_
+This messagem can also be found with **python populate.py -h** command
 ```ShellSession
 usage: populate.py [-h] -p PATHS [PATHS ...] -c CONECTIONS [CONECTIONS ...]  [-d] [-v] [--verbose]
 
@@ -74,12 +74,12 @@ optional arguments:
 ```
 ## Examples
 ### As terminal command
-to run it as command:
+To run it as command:
 ```Shell
 python populate.py --paths /PACS/1/ /PACS/2/ /PACS/3/dicom.dcm --conections DCM4CHEE@10.0.0.1:11112 OTHER@127.0.0.1:5555
 ```
 ### As python module
-to use it as module follow the exemple, also available in populate/examples/exemple1.py
+To use it as module follow the exemple, also available in populate/examples/exemple1.py
 ```Python
 from populate import populate
 
