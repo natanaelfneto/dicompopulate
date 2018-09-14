@@ -21,12 +21,12 @@ Version: **0.4**
 ## Getting Started
 ### Via Bash
 #### Installation Process
-* Via pip
+* Via pip\
 _still not yet available in Pypi repository_
 ```Shell
 pip install git+https://github.com/natanaelfneto/dicompopulate.git
 ```
-* Via Git
+* Via Gitz
 Clone or download the repository at:\
 ```Shell
 git clone https://github.com/natanaelfneto/dicompopulate.git
@@ -41,7 +41,8 @@ _enjoy_
 ## TODO
 * add _'localhost'_, _'pacs.example.com'_, names support insted or just pure IP Addresses
 * fully migrate to python 3 standards
-* replace dcm4chee dcmsnd java binary to the python pynetdicom3 library
+* make C-STORE better by stop closing conections and reopening for each dicom file sent
+* check if file was save on destination conection (probably with C-FIND)
 ## Usage
 _this messagem can also be found with_ **python populate.py -h** _command_
 ```ShellSession
@@ -51,25 +52,25 @@ a script to populate a PACS with folder of DICOM files
 
 optional arguments:
 
--h, --help                                                                  show this help message and exit
+-h, --help                                  show this help message and exit
 
 -p PATHS [PATHS ...], 
---paths PATHS [PATHS ...]                                                   array of dicom folders or files paths
+--paths PATHS [PATHS ...]                   array of dicom folders or files paths
 
 -c CONECTIONS [CONECTIONS ...],
---conections CONECTIONS [CONECTIONS ...]                                    array of conection parameters for dicom 
-                                                                            receivers (Application Entities)
+--conections CONECTIONS [CONECTIONS ...]    array of conection parameters for dicom 
+                                            receivers (Application Entities)
 
--d, --debug                                                                 set debug flag (it only shows debug
-                                                                            information and can be combined with the 
-                                                                            verbose flag for a more robust output and log)
+-d, --debug                                 set debug flag (it only shows debug
+                                            information and can be combined with the 
+                                            verbose flag for a more robust output and log)
 
--v, --version                                                               output software version
+-v, --version                               output software version
 
---verbose                                                                   set verbose flag to enhence output info
-                                                                            (it only shows output information and can
-                                                                            be combined with debug flag for a more
-                                                                            robust output and log)
+--verbose                                   set verbose flag to enhence output info
+                                            (it only shows output information and can
+                                            be combined with debug flag for a more
+                                            robust output and log)
 ```
 ## Examples
 ### As terminal command
