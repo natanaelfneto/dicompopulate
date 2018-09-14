@@ -1,47 +1,102 @@
 <p align="left">
   <a href="#">
-    <img alt="dicom-populate-python-script-logo" src="https://raw.githubusercontent.com/natanaelfneto/dicom_populate/master/dp-logo.png" width="240"/>
+    <img 
+      alt="dicom-populate-python-script-logo" 
+      src="https://raw.githubusercontent.com/natanaelfneto/dicompopulate/master/assets/dp-logo.png" 
+      width="240" />
   </a>
 </p>
 
-**DICOM Populate** was based on the DCM4CHEE binaries do send folders of dicom files to a PACS
-Version: **0.0.1**
+**DICOM Populate** is small code to send folders of dicom files to as many desired PACS server receivers as possible
+Version: **0.4**
 ***
 # Table of Contents
 * [Getting Started](#getting-started)
     * [Installation process](#installation-process)
+    * [Dependencies](#dependencies)
     * [Usage](#usage)
+    * [TODO](#TODO)
 * [License](#license)
 ***
 ## Getting Started
 ### Via Bash
 #### Installation Process
-_installation is still under development, to make it work_
-_clone or download the repository at:_
+* Via pip
+_still not yet available in Pypi repository_
 ```Shell
-git clone https://github.com/natanaelfneto/dicom_populate.git
+pip install git+https://github.com/natanaelfneto/dicompopulate.git
 ```
-_run the command as examplified:_
+* Via Git
+Clone or download the repository at:\
 ```Shell
-python dicom_populate.py --path /PACS/ --pacs DCM4CHEE --address 10.0.0.1 --port 11112
+git clone https://github.com/natanaelfneto/dicompopulate.git
+cd dicompopulate
+python setup.py install
 ```
 _enjoy_
 ***
+### Dependencies
+- pydicom
+- pynetdicom
+## TODO
+* add _'localhost'_, _'pacs.example.com'_, names support insted or just pure IP Addresses
+* fully migrate to python 3 standards
+* replace dcm4chee dcmsnd java binary to the python pynetdicom3 library
 ## Usage
-_this messagem can also be found with_ **python dicom_populate.py -h** _command_
+_this messagem can also be found with_ **python populate.py -h** _command_
 ```ShellSession
-usage: dicom_populate.py [-h] -p PATH -c PACS -a ADDRESS -P PORT [-v] [-l]
+usage: populate.py [-h] -p PATHS [PATHS ...] -c CONECTIONS [CONECTIONS ...]  [-d] [-v] [--verbose]
 
-A DCM4CHEE usage with python script
+a script to populate a PACS with folder of DICOM files
 
 optional arguments:
-  -h, --help                        show this help message and exit
-  -p PATH, --path PATH              dicom folder path
-  -c PACS, --pacs PACS              ae title of destination PACS
-  -a ADDRESS, --address ADDRESS     ip address of destination PACS
-  -P PORT, --port PORT              port of destination PACS
-  -v, --verbose                     process verbose flag
-  -l, --log                         save log file
+
+-h, --help                                                                  show this help message and exit
+
+-p PATHS [PATHS ...], 
+--paths PATHS [PATHS ...]                                                   array of dicom folders or files paths
+
+-c CONECTIONS [CONECTIONS ...],
+--conections CONECTIONS [CONECTIONS ...]                                    array of conection parameters for dicom 
+                                                                            receivers (Application Entities)
+
+-d, --debug                                                                 set debug flag (it only shows debug
+                                                                            information and can be combined with the 
+                                                                            verbose flag for a more robust output and log)
+
+-v, --version                                                               output software version
+
+--verbose                                                                   set verbose flag to enhence output info
+                                                                            (it only shows output information and can
+                                                                            be combined with debug flag for a more
+                                                                            robust output and log)
+```
+## Examples
+### As terminal command
+to run it as command:
+```Shell
+python populate.py --paths /PACS/1/ /PACS/2/ /PACS/3/dicom.dcm --conections DCM4CHEE@10.0.0.1:11112 OTHER@127.0.0.1:5555
+```
+### As python module
+to use it as module follow the exemple, also available in populate/examples/exemple1.py
+```Python
+from populate import populate
+
+# get all files and paths to send
+path_1 = '/PACS/1/'
+path_2 = '/PACS/2/'
+path_3 = '/PACS/3/dicom.dcm'
+
+# get all desired conections to receive
+c_1 = 'DCM4CHEE@10.0.0.1:11112'
+c_2 = 'OTHER@127.0.0.1:5555'
+
+# populate
+populate.run(
+  debug=False,
+  path=[ path_1, path_2, path_3 ],
+  conections=[ c_1, c_2 ]
+)
 ```
 ## License
 MIT License
