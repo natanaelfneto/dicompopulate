@@ -41,7 +41,6 @@ from pydicom import read_file
 from pydicom.uid import ImplicitVRLittleEndian
 from pynetdicom3 import AE
 from pynetdicom3 import StoragePresentationContexts
-from pynetdicom3.sop_class import CTImageStorage
 
 '''
     In runtime there will be some global variables available
@@ -95,7 +94,7 @@ class Populate(object):
     
         try:
             # check if file can be parsed as dicom
-            file = pydicom.dcmread(file_path, force=True)
+            dcmfile = pydicom.dcmread(file_path, force=True)
             status = True
             self.verbose("Successfully parsed {0} as a DICOM file".format(file_path))
 
@@ -119,15 +118,20 @@ class Populate(object):
                     file_path
                 )
 
+                self.logger.debug("Trying C-STORE of {0}".format(output))
+
                 # try to send file through the dicom protocol within C-STORE
                 try:
                     # call C-STORE function
-                    # 
+                    association.store(file_path)
 
                     # check if file was successfully sent to application entity
                     if True:
                         # log successfully file transmition on verbose flag
-                        self.verbose(output)
+                        if logger.verbose_flag:
+                            self.verbose(output)
+                        else:
+                            print("==>> {0} <<==".format(output), end='\r')
                     else:
                         self.logger.debug("{0} could not be sent".format(output))
 
@@ -237,6 +241,7 @@ class Association(object):
         self.contexts = []
         self.port = int(port)
         self.title = title
+        self.transfer_syntax = []
 
         # setup association instance parameters
         self.instance = None
@@ -304,6 +309,8 @@ class Association(object):
         '''
 
         # parse all context values to AE instance
+        self.ae.requested_contexts = StoragePresentationContexts
+
         for context in contexts:
             self.ae.add_requested_context(context)
 
@@ -348,24 +355,25 @@ class Association(object):
                 dcmfile: A file path already parsed as DICOM valid file
         '''
 
-        # store context uuid
-        self.context = [StoragePresentationContexts]
-
         # store flag basic value
         store_status = False
 
         # check if association is successfully established
+        self.logger.debug('Check if association {0} is established'.format(self.title))
         if self.instance.is_established:
             try:
                 # Read the DICOM dataset from file 'dcmfile'
+                self.logger.debug('Retrieve dataset from {0}'.format(dcmfile))
                 dataset = read_file(dcmfile)
+                self.logger.debug('Dataset retrieved')
                 
                 # Send a C-STORE request to the peer with 'dcmfile'
+                self.logger.debug('C-STORE call, waiting for server status response... ')
                 status = self.instance.send_c_store(dataset)
 
                 # output the response from the peer
                 if status:
-                    self.logger.debug('C-STORE at {0} returned STATUS: 0x{1:04x}'.format(output, status.Status))
+                    self.verbose('C-STORE at {0} returned STATUS: 0x{1:04x}'.format(self.output, status.Status))
 
                     # verbose data for success C-STORE of DICOM file
                     self.retrieve_dataset(dataset)
@@ -375,7 +383,7 @@ class Association(object):
 
             # on exception log the error
             except Exception as e:
-                self.logger.error('C-STORE at {0} could not return any status. ERROR: {1}'.format(output, e))
+                self.logger.error('C-STORE at {0} could not return any status. ERROR: {1}'.format(self.output, e))
         
         # retrieve C-STORE success bool
         return store_status
@@ -746,9 +754,7 @@ class Logger(object):
         # check verbose flag and log it
         if self.verbose_flag:
             self.adapter.info(message)
-        else:
-            print("==>> {0} <<==".format(message), end='\r'),
-
+            
 # command line argument parser
 def args(args):
     '''
@@ -906,11 +912,28 @@ def run(debug=False, paths=[], connections=[], verbose=False):
 
     # log the execution time
     exec_time = str(datetime.timedelta(seconds=(time.time() - start_time)))
-    logger.adapter.info('Entire process took {0}'.format(exec_time))
+
+    if int(exec_time.split(':')[0]) != 0:
+        exec_hours = exec_time.split(':')[0] + ' hours '
+    else:
+        exec_hours = ''
+
+    if int(exec_time.split(':')[1]) != 0:
+        exec_minutes = exec_time.split(':')[1] + ' minutes '
+    else:
+        exec_minutes = ''
+
+    if float(exec_time.split(':')[2]) != 0:
+        exec_seconds = exec_time.split(':')[2] + ' seconds'
+    else:
+        exec_seconds = ''
+
+    exec_time_formatted = exec_hours+exec_minutes+exec_seconds
+
+    logger.adapter.info('Entire process took {0}'.format(exec_time_formatted)
+    )
 
 # main function
 if __name__ == "__main__":
     args(sys.argv[1:])
 # end of code
-
-

@@ -8,8 +8,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 ### 0.5 - 2018-09-15
-### Added
+#### Changed
+- populate class call from instance to enable 'with' statement call
+
+#### Added
 - process execution timer
+- send_helper() function for DRY on sending standalone files and files from folder loops
 
 ### 0.4 - 2018-09-12
 #### Changed
