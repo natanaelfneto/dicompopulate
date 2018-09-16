@@ -8,7 +8,7 @@
 </p>
 
 **DICOM Populate** is small code to send folders of dicom files to as many desired PACS server receivers as possible\
-Version: **0.4**
+Version: **0.5**
 ***
 # Table of Contents
 * [Getting Started](#getting-started)

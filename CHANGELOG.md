@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Released]
 
+## [Unreleased]
+### 0.5 - 2018-09-15
+### Added
+- process execution timer
+
 ### 0.4 - 2018-09-12
 #### Changed
 - logger routines to separated class Logger
@@ -43,8 +48,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - dicom_populate.py script with basic run of DCMSND for dicom files inside folder and subfolders
 - a very basic usage og a log file and console output
 - argsparser module
-
-## [Unreleased]
 
 ### 0.0 - 2018-09-07
 #### Added
