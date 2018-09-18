@@ -87,22 +87,25 @@ class Populate(object):
         '''
             Function to send each file parsed in send() function on the loop
             that checks for files or directories and its subdirectories and files
+
+            Arguments:
+                file_path:
         '''
 
         # status standard value
-        status = False
+        dcmfile_status = False
     
         try:
             # check if file can be parsed as dicom
             dcmfile = pydicom.dcmread(file_path, force=True)
-            status = True
-            self.verbose("Successfully parsed {0} as a DICOM file".format(file_path))
+            dcmfile_status = True
+            self.verbose("Successfully parsed {0} as a DICOM file".format(os.path.basename(file_path)))
 
         # exception on parse file as a dicom valid formatted file
         except Exception as e:
-            self.logger.error("Could not parse {0} as a DICOM file".format(file_path))
+            self.logger.error("Could not parse {0} as a DICOM file".format(os.path.basename(file_path)))
 
-        if status:
+        if dcmfile_status:
             # send file to each available connection
             for association in associations:
 
@@ -110,30 +113,29 @@ class Populate(object):
                 self.file_counter = self.file_counter + 1
 
                 # output message
-                output = "File No. {0}, AE: {1}, IP: {2}, PORT: {3}, PATH: {4}".format(
+                output = "File No. {0}, AE: {1}, IP: {2}, PORT: {3}, FILE: {4}".format(
                     str(self.file_counter),
                     association.title,
                     association.addr,
                     association.port,
-                    file_path
+                    os.path.basename(file_path)
                 )
-
                 self.logger.debug("Trying C-STORE of {0}".format(output))
+                self.logger.debug("PATH: {0}".format(file_path))
 
                 # try to send file through the dicom protocol within C-STORE
                 try:
                     # call C-STORE function
-                    association.store(file_path)
+                    store_status = association.store(file_path)
 
                     # check if file was successfully sent to application entity
-                    if True:
+                    if store_status:
                         # log successfully file transmition on verbose flag
-                        if logger.verbose_flag:
-                            self.verbose(output)
-                        else:
+                        self.logger.debug("C-STORE was successfull\n")
+                        if not logger.verbose_flag:
                             print("==>> {0} <<==".format(output), end='\r')
                     else:
-                        self.logger.debug("{0} could not be sent".format(output))
+                        self.logger.debug("{0} could not be sent\n".format(output))
 
                 # exception parser on sending file through the dicom protocol
                 except Exception as e:
@@ -155,11 +157,11 @@ class Populate(object):
         '''
 
         # loop through folder
-        self.logger.info('Looking for files, folder and its subfolders...')
+        self.logger.info('Looking for files...')
         for path in self.paths:
 
             # log message
-            self.logger.debug('Looking for files, folders and its subfolders at {0}...'.format(path))
+            self.logger.debug('Analysing {0}...'.format(os.path.dirname(path)))
 
             # check if path is a file
             if os.path.isfile(path):
@@ -169,7 +171,7 @@ class Populate(object):
 
             # else path is not a file but a directory
             else:
-                self.logger.debug('Checking for files inside {0}'.format(path))    
+                self.logger.debug('Checking for files inside directory...\n')
 
                 # get files inside current path
                 for root, dirs, files in os.walk(path):
@@ -187,14 +189,14 @@ class Populate(object):
 
                     # if no files were found inside folder
                     else:
-                        root = os.path.abspath(os.path.join(root)) 
-                        self.logger.debug('No dicom files were found within this folder %s', root)
+                        root = os.path.abspath(os.path.join(root))
 
                 # log finishing all current path files
-                self.logger.info('Finished looking at %s', path)
+                self.logger.info("Finished looking at {0}".format(path))
 
             # log finishing all parsed paths
-            self.logger.info('Finished all search for files. A total of {0} file were sucessfully sent'.format(str(self.file_counter)))
+            self.logger.info('Finished all search for files')
+            self.logger.info('A total of {0} file were sucessfully sent'.format(str(self.file_counter)))
 
     # exit class routine
     def __exit__(self, exc_type, exc_value, traceback):
@@ -210,7 +212,7 @@ class Populate(object):
             self.logger.debug("Releasing {0} association...".format(association.title))
             try:
                 # release association
-                association.instance.release()
+                dir(association)
                 self.logger.debug("Association {0} successfully released".format(association.title))
 
                 # remove instance of released association
@@ -229,7 +231,12 @@ class Association(object):
     # initialize an instance
     def __init__(self, title, addr, port):
         '''
-            ok
+            Initialize an Association instance for the DICOM Populate module
+
+            Arguments:
+                AE Tittle: Application Entity Title, the PACS 'given name'
+                TCP/IP Address: short for address, the IP Address of the server wich is runnig
+                TCP/IP Port: usually 11112 for dicom comunication, but customable
         '''
 
         # setup logger
@@ -238,14 +245,8 @@ class Association(object):
 
         # setup ae parameters
         self.addr = addr
-        self.contexts = []
         self.port = int(port)
         self.title = title
-        self.transfer_syntax = []
-
-        # setup association instance parameters
-        self.instance = None
-        self.status = False
         
         # start global association array
         global associations
@@ -253,11 +254,6 @@ class Association(object):
 
         # output message
         self.output = "AE: {0}, IP: {1}, PORT: {2}".format(title, addr, str(port))
-
-        # instance of AE for parsed title
-        self.ae = AE(ae_title=str(title))
-
-        self.echo()
             
     # C-ECHO function for echoing application entity
     def echo(self):
@@ -272,75 +268,57 @@ class Association(object):
             (0000, 0900) Status element
         '''
 
-        # echo context uuid
-        self.context = ['1.2.840.10008.1.1']
-
-        # object with connection.status and connection.assoc
-        connection = self.open(self.ae, self.context)
-
-        if self.instance.is_established:
-            try:
-                # get C-ECHO status
-                status = self.instance.send_c_echo()
-
-                # output the response from the peer
-                if status:
-                    self.status = True
-                    self.logger.debug('C-ECHO at {0} returned STATUS: 0x{1:04x}'.format(self.output, status.Status))
-            
-            # 
-            except Exception as e:
-                self.logger.error('C-ECHO at {0} could not return any status. ERROR: {1}'.format(self.output, e))
-
         # 
-        else:
-            self.logger.debug('association with peer was not sucessfull')
+        echo_status = False
 
-    # function to establish an association with an AE
-    def open(self, ae, contexts=[]):
-        '''
-            Function to start new association and keep it open
-            until all files aimed to the referenced application
-            entity could be sent
+        # create an application entity instance, titled 'ae_title'
+        ae = AE(ae_title=str(self.title))
 
-            Arguments:
-                ae: instance of aimed application entity
-                contexts: and array of dicom contexts
-        '''
-
-        # parse all context values to AE instance
-        self.ae.requested_contexts = StoragePresentationContexts
-
-        for context in contexts:
-            self.ae.add_requested_context(context)
+        # echo context uuid
+        ae.add_requested_context('1.2.840.10008.1.1')
 
         # associate with the peer AE
         self.logger.debug('Requesting Association with the peer {0}'.format(self.output))
-        assoc = self.ae.associate(
-            self.addr, 
-            self.port, 
-            ae_title=self.title
-            )
+        assoc = ae.associate(self.addr, self.port, ae_title=self.title)
 
         # check association
         if assoc.is_established: 
+            try:
+                # get C-ECHO status
+                status = assoc.send_c_echo()
+                
+                # log association status
+                self.logger.debug('Association accepted by the peer')
 
-            # retrieve instance of the established association
-            self.instance = assoc
+                # output the response from the peer
+                if status:
+                    echo_status = True
+                    self.logger.debug('C-ECHO at {0} returned STATUS: 0x{1:04x}'.format(self.output, status.Status))
             
-            # log association status
-            self.logger.debug('Association accepted by the peer')
+            # except on sending C-ECHO to AE
+            except Exception as e:
+                self.logger.error('C-ECHO at {0} could not return any status. ERROR: {1}'.format(self.output, e))
         
-        # if any error: Release the association and log it
+        # check for standarized error of association rejection 
         elif assoc.is_rejected:
-            assoc.release()
             self.logger.debug('Association was rejected by the peer')
+
+        # check for standarized error of association aborted 
         elif assoc.is_aborted:
-            assoc.release()
             self.logger.debug('Received an A-ABORT from the peer during Association')
+
+        # log other unkown error as well
         else:
-            assoc.release()
             self.logger.debug('No status value was received from the peer')
+
+        # release the association
+        self.logger.debug('Releasing {0} association'.format(self.title))
+        if not assoc.is_released:
+            assoc.release()
+            self.logger.debug('Association successfully released')
+
+        # return echo status
+        return echo_status
 
     # function to use C-STORE to store a dicom file to an AE
     def store(self, dcmfile):
@@ -358,33 +336,60 @@ class Association(object):
         # store flag basic value
         store_status = False
 
+        # dataset standard value
+        dataset = None
+
+        # Read the DICOM dataset from file 'dcmfile'
+        try:
+            dataset = read_file(dcmfile)  
+        except Exception as e:
+            self.logger.error('Could not retrieve dataset from {0}'.format(dcmfile))    
+
+        # create an application entity instance, titled 'ae_title'
+        ae = AE(ae_title=str(self.title))
+
+        # store context uids
+        ae.requested_contexts = StoragePresentationContexts
+
+        # associate with the peer AE
+        self.logger.debug('Requesting Association with the peer {0}'.format(self.output))
+        assoc = ae.associate(self.addr, self.port, ae_title=self.title)
+
         # check if association is successfully established
-        self.logger.debug('Check if association {0} is established'.format(self.title))
-        if self.instance.is_established:
-            try:
-                # Read the DICOM dataset from file 'dcmfile'
-                self.logger.debug('Retrieve dataset from {0}'.format(dcmfile))
-                dataset = read_file(dcmfile)
-                self.logger.debug('Dataset retrieved')
-                
-                # Send a C-STORE request to the peer with 'dcmfile'
+        if assoc.is_established:
+            # check dataset for value equal None
+            if dataset is not None:
+
+                # try to send 'dcmfile' through a C-STORE call
                 self.logger.debug('C-STORE call, waiting for server status response... ')
-                status = self.instance.send_c_store(dataset)
+                try:
+                    # Send a C-STORE request to the peer with 'dcmfile'
+                    status = assoc.send_c_store(dataset)
 
-                # output the response from the peer
-                if status:
-                    self.verbose('C-STORE at {0} returned STATUS: 0x{1:04x}'.format(self.output, status.Status))
+                    # output the response from the peer
+                    if status:
+                        self.verbose('C-STORE at {0} returned STATUS: 0x{1:04x}'.format(self.output, status.Status))
 
-                    # verbose data for success C-STORE of DICOM file
-                    self.retrieve_dataset(dataset)
+                        # verbose data for success C-STORE of DICOM file
+                        self.retrieve_dataset(dataset)
 
-                    # return true for C-STORE of 'dcmfile'
-                    store_status = True
+                        # return true for C-STORE of 'dcmfile'
+                        store_status = True
 
-            # on exception log the error
-            except Exception as e:
-                self.logger.error('C-STORE at {0} could not return any status. ERROR: {1}'.format(self.output, e))
+                # if an exception occur while sending 'dcmfile'
+                except Exception as e:
+                     self.logger.error('C-STORE at {0} could not return any status. ERROR: {1}'.format(self.output, e))
+            
+            # if no dataset was received
+            else:
+                self.logger.error('Retrieved dataset triggered and exception')    
         
+        # release the association
+        self.logger.debug('Releasing {0} association'.format(self.title))
+        if not assoc.is_released:
+            assoc.release()
+            self.logger.debug('Association successfully released')
+
         # retrieve C-STORE success bool
         return store_status
 
@@ -476,36 +481,6 @@ class Association(object):
             # 'WindowCenter', 
             # 'WindowWidth', 
             # 'XRayTubeCurrent', 
-
-            # # '_convert_YBR_to_RGB', 
-            # # '_dataset_slice', 
-            # # '_get_pixel_array', 
-            # # '_is_uncompressed_transfer_syntax', 
-            # # '_pretty_str', 
-            # # '_reshape_pixel_array', 
-            # # '_slice_dataset', 
-
-            # # 'add', 
-            # # 'add_new', 
-            # # 'clear', 
-            # # 'convert_pixel_data', 
-            # # 'copy', 
-            # # 'data_element', 
-            # # 'decode', 
-            # # 'decompress', 
-            # # 'formatted_lines', 
-            # # 'fromkeys', 
-            # # 'group_dataset', 
-            # 'is_original_encoding', 
-            # # 'pixel_array', 
-            # # 'pop', 
-            # # 'popitem', 
-            # # 'remove_private_tags', 
-            # # 'setdefault', 
-            # # 'top', 
-            # # 'trait_names',
-            # # 'values', 
-            # # 'walk'
         ]
 
         # get a temporary output variable
@@ -641,14 +616,15 @@ class ConnectionsValidity(object):
 
                 # else all regex parsed and connection has the minimum format
                 else:
+
+                    # output message
+                    output = "AE: {0}, IP: {1}, PORT: {2}".format(title, addr, str(port))
+
                     # setup associations instancies
                     for connection in connections:
                         '''
                             Associantion object:
-                                assoc.status [bool value]
-                                assoc.instance [Association]
                                 assoc.addr [tcp/ip address]
-                                assoc.contexts [dicom context array]
                                 assoc.port [tcp/ip port]
                                 assoc.title [Application Entity Title]
 
@@ -656,18 +632,12 @@ class ConnectionsValidity(object):
                         assoc = Association(title, addr, port)
 
                         # if association status exist
-                        if assoc.status:
-
+                        if assoc.echo():
                             # append association into global array
                             associations.append(assoc)
-                        
-                        # is there is not an association, log error
+                            self.logger.debug('Finished C-ECHO at {0}. It was successfull'.format(output))
                         else:
-                            # output message
-                            message = "{0} cound not be reached".format(output)
-
-                            # log message
-                            self.logger.error(message)
+                            self.logger.debug('Finished C-ECHO at {0}. It failed'.format(output))
 
         # return valid parameters for application entities
         return associations
@@ -754,7 +724,7 @@ class Logger(object):
         # check verbose flag and log it
         if self.verbose_flag:
             self.adapter.info(message)
-            
+
 # command line argument parser
 def args(args):
     '''
@@ -910,28 +880,14 @@ def run(debug=False, paths=[], connections=[], verbose=False):
     with Populate(paths) as populate:
         populate.send()
 
+    # get end time
+    end_time = time.time() - start_time
+
+    # format time from pure seconds to dd:hh:mm:ss
+    exec_time = datetime.timedelta(seconds=(end_time))
+
     # log the execution time
-    exec_time = str(datetime.timedelta(seconds=(time.time() - start_time)))
-
-    if int(exec_time.split(':')[0]) != 0:
-        exec_hours = exec_time.split(':')[0] + ' hours '
-    else:
-        exec_hours = ''
-
-    if int(exec_time.split(':')[1]) != 0:
-        exec_minutes = exec_time.split(':')[1] + ' minutes '
-    else:
-        exec_minutes = ''
-
-    if float(exec_time.split(':')[2]) != 0:
-        exec_seconds = exec_time.split(':')[2] + ' seconds'
-    else:
-        exec_seconds = ''
-
-    exec_time_formatted = exec_hours+exec_minutes+exec_seconds
-
-    logger.adapter.info('Entire process took {0}'.format(exec_time_formatted)
-    )
+    logger.adapter.info('Entire process took {0}'.format(exec_time))
 
 # main function
 if __name__ == "__main__":
