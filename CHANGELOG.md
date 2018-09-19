@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Released]
 
+## [Unreleased]
+### 0.5 - 2018-09-15
+#### Changed
+- populate class call from instance to enable 'with' statement call
+
+#### Added
+- process execution timer
+- send_helper() function for DRY on sending standalone files and files from folder loops
+- multithread handler for the store function
+- maximum workers value to be parsed as an optional input value from user. default is set to 10
+- workers wait function to release populate instance only when all threads were done and when release flag is set
+
 ### 0.4 - 2018-09-12
 #### Changed
 - logger routines to separated class Logger
@@ -43,8 +55,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - dicom_populate.py script with basic run of DCMSND for dicom files inside folder and subfolders
 - a very basic usage og a log file and console output
 - argsparser module
-
-## [Unreleased]
 
 ### 0.0 - 2018-09-07
 #### Added

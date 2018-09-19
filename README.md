@@ -8,7 +8,7 @@
 </p>
 
 **DICOM Populate** is small code to send folders of dicom files to as many desired PACS server receivers as possible\
-Version: **0.4**
+Version: **0.5**
 ***
 # Table of Contents
 * [Getting Started](#getting-started)
@@ -41,12 +41,16 @@ _enjoy_
 ## TODO
 * add _'localhost'_, _'pacs.example.com'_, names support insted or just pure IP Addresses
 * fully migrate to python 3 standards
-* make C-STORE better by stop closing conections and reopening for each dicom file sent
+* make C-STORE better by stop closing conections and reopening for each dicom file sent [not yet sure how]
 * check if file was save on destination conection (probably with C-FIND)
+* check for valid TCP/IP:PORT listen before a C-ECHO attempt
+* manage to save (proably with a simple sqlite database or other) wich files were already sent to avoid duplicate attempts on a re-run
+* run script for a local and remote origin and local and remote destiny (only availabe so far from local origin to local and remote destiny)
+* make available a test script for sending and receiving dicom files on python sender to python receiver, python sender and non-python receiver
 ## Usage
 This messagem can also be found with **python populate.py -h** command
 ```ShellSession
-usage: populate.py [-h] -p PATHS [PATHS ...] -c CONECTIONS [CONECTIONS ...]  [-d] [-v] [--verbose]
+usage: populate.py [-h] -p PATHS [PATHS ...] -c CONECTIONS [CONECTIONS ...]  [-d] [-v] [-w] [--verbose]
 
 a script to populate a PACS with folder of DICOM files
 
@@ -66,6 +70,10 @@ optional arguments:
                                             verbose flag for a more robust output and log)
 
 -v, --version                               output software version
+
+-w, --max_workers                           set the maximum number of parallel
+                                            processes allowed for C-STORE threads
+                                            (default value is 10)
 
 --verbose                                   set verbose flag to enhence output info
                                             (it only shows output information and can
@@ -94,10 +102,14 @@ c_2 = 'OTHER@127.0.0.1:5555'
 
 # populate
 populate.run(
-  debug=False,
+  # debug=True,
+  # verbose=True,
+  # max_workers=10,
   path=[ path_1, path_2, path_3 ],
   conections=[ c_1, c_2 ]
 )
+
+# debug, verbose and max_workers values are optional
 ```
 ## License
 MIT License

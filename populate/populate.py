@@ -4,7 +4,7 @@
 __project__ = "populate"
 
 # project version
-__version__ = "0.4"
+__version__ = "0.5"
 
 # prohect author
 __author__ = "natanaelfneto"
@@ -28,22 +28,42 @@ short_description = "a script to populate a PACS with folder of DICOM files"
 
 # third party imports
 import argparse
+import datetime
 import getpass
 import logging
 import pydicom
 import os
 import re
 import sys
+import time
+import threading
 
+from concurrent.futures import (
+    ThreadPoolExecutor,
+    wait
+)
 from pydicom import read_file
-from pynetdicom3 import AE
-from pynetdicom3 import StoragePresentationContexts
+from pydicom.uid import ImplicitVRLittleEndian
+from pynetdicom3 import (
+    AE,
+    StoragePresentationContexts
+)
+
+'''
+    In runtime there will be some global variables available
+
+    * logger, wich contains an instance for logging with stream and file handles
+        to be used across classes and functions
+    
+    * associations, with consist of an array of Association instancies wich each
+        object has an open association with the remote application entity
+'''
 
 # class for populate application entities
-class Populate(object):
+class Populate(object): 
 
     # initialize an instance
-    def __init__(self):
+    def __init__(self, paths):
         ''' 
             Initiate a DICOM Populate instance.
 
@@ -55,273 +75,354 @@ class Populate(object):
         self.logger = logger.adapter
         self.verbose = logger.verbose
 
-    # 
-    def send(self, paths, conections):
+        # internalize variables
+        self.paths = paths
+        self.file_counter = 0
+
+        # set initial release status
+        self.is_released = False
+        
+        # set threads variables
+        self.pool = ThreadPoolExecutor(max_workers=max_workers_permitted)
+        self.futures = []
+
+    # enter class basic rotine
+    def __enter__(self):
+        '''
+            Function for entering class with python 3 standards of
+            'with' parameter and a following __exit__ function for
+            a cleanner use of the class instancies
+        '''
+        try:
+            return self
+        except StopIteration:
+           raise RuntimeError("Instance could not be returned")
+
+    # send helper for send function
+    def send_helper(self, file_path):
+        '''
+            Function to send each file parsed in send() function on the loop
+            that checks for files or directories and its subdirectories and files
+
+            Arguments:
+                file_path:
+        '''
+
+        # status standard value
+        dcmfile_status = False
+    
+        try:
+            # check if file can be parsed as dicom
+            dcmfile = pydicom.dcmread(file_path, force=True)
+            dcmfile_status = True
+            self.verbose("Successfully parsed {0} as a DICOM file".format(os.path.basename(file_path)))
+
+        # exception on parse file as a dicom valid formatted file
+        except Exception as e:
+            self.logger.error("Could not parse {0} as a DICOM file".format(os.path.basename(file_path)))
+
+        if dcmfile_status:
+            # send file to each available connection
+            for association in associations:
+
+                # increment file counter
+                self.file_counter = self.file_counter + 1
+
+                # output message
+                output = "File No. {0}, AE: {1}, IP: {2}, PORT: {3}, FILE: {4}".format(
+                    str(self.file_counter),
+                    association.title,
+                    association.addr,
+                    association.port,
+                    os.path.basename(file_path)
+                )
+                self.logger.debug("Trying C-STORE of {0}".format(output))
+                self.logger.debug("PATH: {0}".format(file_path))
+
+                # try to send file through the dicom protocol within C-STORE
+                try:
+                    # call C-STORE function
+                    self.futures.append(self.pool.submit(association.store, file_path))
+
+                    # log successfully file transmition on verbose flag
+                    logger.adapter.debug("C-STORE thread was successfull created")
+                    if not logger.verbose_flag:
+                        print("==>> {0} <<==".format(output), end='\r')                
+
+                # exception parser on sending file through the dicom protocol
+                except Exception as e:
+                    self.logger.error("Error while sending {0} ERROR: {1}".format(output, e))
+   
+    # function to send each valid dicom file to each valid application entity connection
+    def send(self):
         '''
             DICOM Populate send function. Get all files inside received paths and
-            send then to PACS environments with especific conections also received
+            send then to PACS environments with especific connections also received
             from function call
 
             Arguments:
                 files: Array of files and/or folder to be sent to a PACS environment
-                conection: Parameters for sending DICOM files
-                    conection.aet: Application Entity Title, the PACS 'given name'
-                    conection.addr: short for address, the IP Address of the server wich is runnig
-                    conection.port: usually 11112 for dicom comunication, but customable
+                connection: Parameters for sending DICOM files
+                    connection.aet: Application Entity Title, the PACS 'given name'
+                    connection.addr: short for address, the IP Address of the server wich is runnig
+                    connection.port: usually 11112 for dicom comunication, but customable
         '''
-
-        # set basic variable
-        i = 0
 
         # loop through folder
-        self.logger.debug('Looping throug parsed folder and subfolders...')
-        for path in paths:
-            # get files inside current path
-            self.logger.debug('Looping throug files inside folder and its subfolders...')
-            self.logger.info('Sending files at {0}'.format(path))
+        self.logger.info('Looking for files...')
+        for path in self.paths:
 
-            for root, dirs, files in os.walk(path):
-                # check if folder is not empty
-                if files:
-                    # for each file founded
-                    for file in files:
+            # log message
+            self.logger.debug('Analysing {0}...'.format(os.path.dirname(path)))
 
-                        # get absolute path
-                        file_path = os.path.abspath(os.path.join(root, file))
+            # check if path is a file
+            if os.path.isfile(path):
+                
+                # send file to parsed connections
+                self.send_helper(os.path.abspath(path))
 
-                        # check if file can be parsed as dicom
-                        try:
-                            dcmfile = pydicom.dcmread(file_path, force=True)
-                        except Exception as e:
-                            self.logger.debug("Could not parse {0} as a DICOM file".format(file_path))
-                            continue
+            # else path is not a file but a directory
+            else:
+                self.logger.debug('Checking for files inside directory...')
 
-                        # send file to each available conection
-                        for conection in conections:
-                            try:
-                                # send file through pynetdicom3 library
-                                if ConectionsValidity().store(conection, file_path):
+                # get files inside current path
+                for root, dirs, files in os.walk(path):
+                    # check if folder is not empty
 
-                                    # increment file counter
-                                    i = i + 1
+                    if files:
+                        # for each file founded
 
-                                    # output message
-                                    output = "File No. {0}, AE: {1}, IP: {2}, PORT: {3}, PATH: {4}".format(
-                                        str(i),
-                                        conection['title'],
-                                        conection['addr'],
-                                        conection['port'],
-                                        file_path
-                                    )
+                        for file in files:
+                            # get absolute path
+                            file_path = os.path.abspath(os.path.join(root, file))
 
-                                    # log successfully file transmition
-                                    self.verbose(output)
+                            # send file to parsed connections
+                            self.send_helper(file_path)
 
-                                # file not sent
-                                else:
-                                    self.logger.debug("{0} could not be sent".format(output))
+                    # if no files were found inside folder
+                    else:
+                        root = os.path.abspath(os.path.join(root))
 
-                            # exception catcher
-                            except Exception as e:
-                                self.logger.error("Error while sending {0} ERROR: {1}".format(output, e))
+                # log finishing all current path files
+                self.logger.info("Finished looking at {0}".format(path))
+                self.logger.info("Wainting for next step to finish...")
 
-                # if no files were found inside folder
-                else:
-                    root = os.path.abspath(os.path.join(root)) 
-                    self.logger.debug('No dicom files were found within this folder %s', root)
+            # finish the instance active status
+            self.is_released = True
 
-            # log finishing all current path files
-            self.logger.info('Finished loop at %s', path)
-
-        # log finishing all parsed paths
-        self.logger.info('Finished all loops for files. A total of {0} file were sucessfully sent'.format(str(i)))
-
+    # exit class routine
     def __exit__(self, exc_type, exc_value, traceback):
-        for file in self.files:
-            os.unlink(file)
 
-# class for paths argument parser
-class PathsValidity(object):
+        # wait for futures before releasing
+        wait(self.futures)
 
-    # path validity init
-    def __init__(self):
-        ''' 
-            Initiate a DICOM Populate Path Validity instance.
-
-            Argument:
-                logger: a logging instance for output and log
+        # wait for class instance to receive a release status
+        while not self.is_released:
+            pass    
+        '''
+            Function to release all application entity associations instancies
         '''
 
-        # setup logger
-        self.logger = logger.adapter
-        
-    # path validity checker function
-    def validate(self, paths):
+        # releasing all active connections associations
+        self.logger.info("Releasing all active association...")
+        for association in associations:
+
+            # release association
+            self.logger.debug("Releasing {0} association...".format(association.title))
+            try:
+                # release association
+                dir(association)
+                self.logger.debug("Association {0} successfully released".format(association.title))
+
+                # remove instance of released association
+                associations.remove(association)
+            except Exception as e:
+                self.logger.debug("Association {0} release failed".format(association.title))
+
+        if len(associations) == 0:
+            self.logger.info("All associations successfully released")
+        else:
+            self.logger.info("Some associations release failed: {0}".format(associations))
+
+         # log finishing all parsed paths
+        self.logger.info('Finished all search for files')
+        self.logger.info('A total of {0} file were sucessfully sent'.format(str(self.file_counter)))
+
+# class for associations with application entities
+class Association(object):
+
+    # initialize an instance
+    def __init__(self, title, addr, port):
         '''
-            Function to check if each parsed path is a valid system file or folder
-            and if it can be accessed by the code.
+            Initialize an Association instance for the DICOM Populate module
 
             Arguments:
-                paths: array of files and folders to be checked
-        '''
-
-        # set basic variable for valid files
-        valid_paths = []
-
-        # loop check through parsed path
-        self.logger.debug('checking validity of parsed paths')
-        for path in paths:
-
-            # append path if it exists, is accessible
-            if os.access(path, os.F_OK) and os.access(path, os.R_OK):               
-                valid_paths.append(path)
-
-            # if not, log the error
-            else:
-                output = "Path {0} could not be found or does not have read permitions on, therefore will be ignored".format(path)
-                self.logger.debug(output)
-        
-        # return all parsed valid paths
-        return valid_paths
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        for file in self.files:
-            os.unlink(file)
-
-# class for conection argument parser
-class ConectionsValidity(object):
-
-    # path validity init
-    def __init__(self):
-        ''' 
-            Initiate a DICOM Populate Conection Validity instance.
-
-            Argument:
-                logger: a logging instance for output and log
+                AE Tittle: Application Entity Title, the PACS 'given name'
+                TCP/IP Address: short for address, the IP Address of the server wich is runnig
+                TCP/IP Port: usually 11112 for dicom comunication, but customable
         '''
 
         # setup logger
         self.logger = logger.adapter
         self.verbose = logger.verbose
 
-    def echo(self, title, addr, port):
-        '''
-
-        '''
-
-        # ae echo status flag
-        echo_status = False
+        # setup ae parameters
+        self.addr = addr
+        self.port = int(port)
+        self.title = title
+        
+        # start global association array
+        global associations
+        associations = []
 
         # output message
-        output = "AE: {0}, IP: {1}, PORT: {2}".format(title, addr, str(port))
-        self.logger.info('Trying C-ECHO at {0}'.format(output))
-
-        # instance of AE for parsed title
-        ae = AE(ae_title=str(title))
-
+        self.output = "AE: {0}, IP: {1}, PORT: {2}".format(title, addr, str(port))
+            
+    # C-ECHO function for echoing application entity
+    def echo(self):
         '''
+            Function to send C-ECHO to a receiver Application Entity
             Verification SOP Class has a UID of 1.2.840.10008.1.1
             we can use the UID string directly when requesting the presentation
             contexts we want to use in the association
+
+            Send a DIMSE C-ECHO request to the peer
+            status is a pydicom Dataset object with (at a minimum) a
+            (0000, 0900) Status element
         '''
+
+        # 
+        echo_status = False
+
+        # create an application entity instance, titled 'ae_title'
+        ae = AE(ae_title=str(self.title))
+
+        # echo context uuid
         ae.add_requested_context('1.2.840.10008.1.1')
 
         # associate with the peer AE
-        self.logger.debug('Requesting Association with the peer for {0}'.format(output))
-        assoc = ae.associate(addr, port, ae_title=str(title))
+        self.logger.debug('Requesting Association with the peer {0}'.format(self.output))
+        assoc = ae.associate(self.addr, self.port, ae_title=self.title)
 
         # check association
-        if assoc.is_established:
-            '''
-                Send a DIMSE C-ECHO request to the peer
-                status is a pydicom Dataset object with (at a minimum) a
-                (0000, 0900) Status element
-            '''
-            self.logger.debug('Association accepted by the peer')
-
+        if assoc.is_established: 
             try:
-                # get association status
+                # get C-ECHO status
                 status = assoc.send_c_echo()
+                
+                # log association status
+                self.logger.debug('Association accepted by the peer')
 
                 # output the response from the peer
                 if status:
                     echo_status = True
-                    self.logger.info('C-ECHO at {0} returned STATUS: 0x{1:04x}'.format(output, status.Status))
+                    self.logger.debug('C-ECHO at {0} returned STATUS: 0x{1:04x}'.format(self.output, status.Status))
             
-            # 
+            # except on sending C-ECHO to AE
             except Exception as e:
-                self.logger.error('C-ECHO at {0} could not return any status. ERROR: {1}'.format(output, e))
-
+                self.logger.error('C-ECHO at {0} could not return any status. ERROR: {1}'.format(self.output, e))
+        
+        # check for standarized error of association rejection 
         elif assoc.is_rejected:
-            self.logger.debug('Association was rejected by the peer')
+            self.logger.error('Association was rejected by the peer')
+
+        # check for standarized error of association aborted 
         elif assoc.is_aborted:
-            self.logger.debug('Received an A-ABORT from the peer during Association')
+            self.logger.error('Received an A-ABORT from the peer during Association')
 
-        # Release the association
-        assoc.release()
+        # log other unkown error as well
+        else:
+            self.logger.error('No status value was received from the peer')
 
-        # return flag for successfuly echo
+        # release the association
+        self.logger.debug('Releasing {0} association'.format(self.title))
+        if not assoc.is_released:
+            assoc.release()
+            self.logger.debug('Association successfully released')
+
+        # return echo status
         return echo_status
 
-    def store(self, conection, dcmfile):
+    # function to use C-STORE to store a dicom file to an AE
+    def store(self, dcmfile):
+        '''
+            Function to C-STORE a dicom file into a remote receiver 
 
-        # ae store status flag
+            Arguments:
+                connection: Parameters for sending DICOM files
+                    connection.aet: Application Entity Title, the PACS 'given name'
+                    connection.addr: short for address, the IP Address of the server wich is runnig
+                    connection.port: usually 11112 for dicom comunication, but customable
+                dcmfile: A file path already parsed as DICOM valid file
+        '''
+
+        # store flag basic value
         store_status = False
 
-        # output message
-        output = "AE: {0}, IP: {1}, PORT: {2}".format(conection['title'], conection['addr'], str(conection['port']))
-        self.logger.debug('Trying C-STORE dicom file at {0}'.format(output))
+        # dataset standard value
+        dataset = None
 
-        # instance of AE for parsed title
-        ae = AE(ae_title=str(conection['title']))
+        # Read the DICOM dataset from file 'dcmfile'
+        try:
+            dataset = read_file(dcmfile)  
+        except Exception as e:
+            self.logger.error('Could not retrieve dataset from {0}'.format(dcmfile))    
 
-        '''
-           
-        '''
+        # create an application entity instance, titled 'ae_title'
+        ae = AE(ae_title=str(self.title))
+
+        # store context uids
         ae.requested_contexts = StoragePresentationContexts
 
         # associate with the peer AE
-        self.logger.debug('Requesting Association with the peer for {0}'.format(output))
-        assoc = ae.associate(conection['addr'], conection['port'], ae_title=str(conection['title']))
+        self.logger.debug('Requesting Association with the peer {0}'.format(self.output))
+        assoc = ae.associate(self.addr, self.port, ae_title=self.title)
 
-        # check association
+        # check if association is successfully established
         if assoc.is_established:
-            '''
-                
-            '''
-            self.logger.debug('Association accepted by the peer')
+            # check dataset for value equal None
+            if dataset is not None:
 
-            try:
-                # Read the DICOM dataset from file 'dcmfile'
-                dataset = read_file(dcmfile)               
+                # try to send 'dcmfile' through a C-STORE call
+                self.logger.debug('C-STORE call, waiting for server status response... ')
+                try:
+                    # Send a C-STORE request to the peer with 'dcmfile'
+                    status = assoc.send_c_store(dataset)
 
-                # Send a DIMSE C-STORE request to the peer
-                status = assoc.send_c_store(dataset)
+                    # output the response from the peer
+                    if status:
+                        self.verbose('C-STORE at {0} returned STATUS: 0x{1:04x}'.format(self.output, status.Status))
 
-                # output the response from the peer
-                if status:
-                    store_status = True
-                    self.logger.debug('C-STORE at {0} returned STATUS: 0x{1:04x}'.format(output, status.Status))
+                        # verbose data for success C-STORE of DICOM file
+                        self.retrieve_dataset(dataset)
 
-                    # verbose data for success C-STORE of DICOM file
-                    self.retrieve_dataset(dataset) 
+                        # return true for C-STORE of 'dcmfile'
+                        store_status = True
 
-            # 
-            except Exception as e:
-                self.logger.error('C-STORE at {0} could not return any status. ERROR: {1}'.format(output, e))
-
-        elif assoc.is_rejected:
-            self.logger.debug('Association was rejected by the peer')
-        elif assoc.is_aborted:
-            self.logger.debug('Received an A-ABORT from the peer during Association')
-
-        # Release the association
-        assoc.release()
+                # if an exception occur while sending 'dcmfile'
+                except Exception as e:
+                     self.logger.error('C-STORE at {0} could not return any status. ERROR: {1}'.format(self.output, e))
+            
+            # if no dataset was received
+            else:
+                self.logger.error('Retrieved dataset triggered and exception')    
         
-        return store_status
-
+        # release the association
+        self.logger.debug('Releasing {0} association'.format(self.title))
+        if not assoc.is_released:
+            assoc.release()
+            self.logger.debug('Association successfully released')
+        
+    # function to retrieve data from a dicom dataset
     def retrieve_dataset(self, dataset):
+        '''
+            Function to retrieve DICOM dataset desired values to verbose them
 
+            Argument:
+                dataset: a dicom array of variables and values from DICOM standards
+        '''
+
+        # dicom dataset values to be used in the verbose output
         data = [
             # 'AccessionNumber',
             # 'AcquisitionDate',
@@ -400,116 +501,168 @@ class ConectionsValidity(object):
             # 'WindowCenter', 
             # 'WindowWidth', 
             # 'XRayTubeCurrent', 
-
-            # # '_convert_YBR_to_RGB', 
-            # # '_dataset_slice', 
-            # # '_get_pixel_array', 
-            # # '_is_uncompressed_transfer_syntax', 
-            # # '_pretty_str', 
-            # # '_reshape_pixel_array', 
-            # # '_slice_dataset', 
-
-            # # 'add', 
-            # # 'add_new', 
-            # # 'clear', 
-            # # 'convert_pixel_data', 
-            # # 'copy', 
-            # # 'data_element', 
-            # # 'decode', 
-            # # 'decompress', 
-            # # 'formatted_lines', 
-            # # 'fromkeys', 
-            # # 'group_dataset', 
-            # 'is_original_encoding', 
-            # # 'pixel_array', 
-            # # 'pop', 
-            # # 'popitem', 
-            # # 'remove_private_tags', 
-            # # 'setdefault', 
-            # # 'top', 
-            # # 'trait_names',
-            # # 'values', 
-            # # 'walk'
         ]
 
+        # get a temporary output variable
         temp = ''
-        for data_title in data:
-            temp = temp + '\n {0}: {1}'.format(data_title, getattr(dataset, data_title))
 
+        # increment the temporary output variable within desired data from parsed dataset
+        for data_title in data:
+            try:
+                temp = temp + '\n {0}: {1}'.format(data_title, getattr(dataset, data_title))
+            except Exception as e:
+                self.logger.debug('Could not retrieve {0} out of {} dicom file'.format(data_title, getattr(dataset, 'StudyID')))
+
+        # concatenate temporary output variable with formated output message
         output = 'Retrieve dicom dataset while omitting patient sensitive data \n' +\
         '\n >> ============================ <<' + temp + '\n'
 
         # verbose output for success on C-STORE DICOM files
         self.verbose(output)
 
-    # conection validity checker function
-    def validate(self, conections):
+# class for paths argument parser
+class PathsValidity(object):
+
+    # path validity init
+    def __init__(self):
+        ''' 
+            Initiate a DICOM Populate Path Validity instance.
+
+            Argument:
+                logger: a logging instance for output and log
         '''
 
+        # setup logger
+        self.logger = logger.adapter
+        
+    # path validity checker function
+    def validate(self, paths):
+        '''
+            Function to check if each parsed path is a valid system file or folder
+            and if it can be accessed by the code.
+
+            Arguments:
+                paths: array of files and folders to be checked
         '''
 
-        # 
-        valid_aes = []
+        # set basic variable for valid files
+        valid_paths = []
 
-        # 
-        self.logger.debug('checking validity of parsed conections')
-        for conection in conections:
+        # loop check through parsed path
+        self.logger.debug('Checking validity of parsed paths')
+        for path in paths:
 
-            # check if conection format passed is correct
-            if not conection.count('@') == 1 or not conection.count(':') == 1:
-                self.logger.debug('Wrong conection format was passed: %s',conection)
+            # check if path exist
+            if not os.access(path, os.F_OK):
+                output = "Path {0} could not be found, therefore will be ignored".format(path)
+                self.logger.debug(output)
 
-            # 
+            # check if path has read permitions on
+            if not  os.access(path, os.R_OK):
+                output = "Path {0} does not have read permitions on, therefore will be ignored".format(path)
+                self.logger.debug(output)
+
+            # append path to a valid paths array if it exists and is accessible    
+            else:
+                valid_paths.append(path)
+
+        # return all parsed valid paths
+        return valid_paths
+
+# class for connection argument parser
+class ConnectionsValidity(object):
+
+    # path validity init
+    def __init__(self):
+        ''' 
+            Initiate a DICOM Populate connection Validity instance.
+
+            Argument:
+                logger: a logging instance for output and log
+        '''
+
+        # setup logger
+        self.logger = logger.adapter
+        self.verbose = logger.verbose
+
+    # connection validity checker function
+    def validate(self, connections):
+        '''
+            Function to check if each parsed connection is a valid application entity connection
+            and if it can be remote accessed by the code.
+
+            Arguments:
+                connections: array of parameters for a application entity connection to be checked
+        '''
+
+        # check validity for each connection
+        self.logger.debug('Checking validity of parsed connections')
+        for connection in connections:
+
+            # check if connection minimum format passed is not correct
+            if not connection.count('@') == 1 or not connection.count(':') == 1:
+                self.logger.error('Wrong connection format was passed: %s',connection)
+
+            # if the minimun format is correct
             else:
 
-                # get AE Title format
-                title = conection.split('@')[0]
+                # get AE Title from connection
+                title = str(connection.split('@')[0])
 
-                # get TCP/IP Address format
-                addr = conection.split('@')[1].split(':')[0]
-                
-                # get TCP/IP Port format
-                port = conection.split('@')[1].split(':')[1]
+                # get TCP/IP Address from connection
+                addr = connection.split('@')[1].split(':')[0]
+
+                # try to parse tcp/ip port as an integer 
+                try:
+                    port = int(connection.split('@')[1].split(':')[1])
+                except Exception as e:
+                    self.logger.error('Wrong connection TCP/IP Port was passed: %s', port)
+                    continue
 
                 # output message
                 output = "AE: {0}, IP: {1}, PORT: {2}".format(title, addr, str(port))
 
-                # check if ae_title, address and port are in correct format
+                # check if ae_title is in correct format
                 if not re.match(r"^\w+$",title):
-                    self.logger.debug('Wrong conection AE Title was passed: %s', title)
+                    self.logger.error('Wrong connection AE Title was passed: %s', title)
 
-                # 
+                # check if tcp/ip address is in correct format
                 elif not re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$",addr):
-                    self.logger.debug('Wrong conection TCP/IP Address was passed: %s', addr)
+                    self.logger.error('Wrong connection TCP/IP Address was passed: %s', addr)
 
-                # 
-                elif not re.match(r"^\d{2,5}$",port) and int(port):
-                    self.logger.debug('Wrong conection TCP/IP Port was passed: %s', port)
+                # check if tcp/ip port is in correct format
+                elif not re.match(r"^\d{2,5}$",str(port)) and int(port):
+                    self.logger.error('Wrong connection TCP/IP Port was passed: %s', port)
 
-                # 
-                elif self.echo(title, addr, int(port)):
-                    valid_aes.append({
-                        'title': title,
-                        'addr': addr,
-                        'port': int(port)
-                    })
-
-                #
+                # else all regex parsed and connection has the minimum format
                 else:
-                    # output message
-                    message = "{0} cound not be reached".format(output)
 
-                    # log message
-                    self.logger.debug(message)
+                    # output messageNo
+                    output = "AE: {0}, IP: {1}, PORT: {2}".format(title, addr, str(port))
+
+                    # setup associations instancies
+                    for connection in connections:
+                        '''
+                            Associantion object:
+                                assoc.addr [tcp/ip address]
+                                assoc.port [tcp/ip port]
+                                assoc.title [Application Entity Title]
+
+                        '''
+                        assoc = Association(title, addr, port)
+
+                        # if association status exist
+                        if assoc.echo():
+                            # append association into global array
+                            associations.append(assoc)
+                            self.logger.debug('Finished C-ECHO at {0}. It was successfull'.format(output))
+                        else:
+                            self.logger.error('Finished C-ECHO at {0}. It failed'.format(output))
 
         # return valid parameters for application entities
-        return valid_aes
+        return associations
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        for file in self.files:
-            os.unlink(file)
-
-# 
+# class for logger instancies and configurations
 class Logger(object):
 
     # path validity init
@@ -557,6 +710,7 @@ class Logger(object):
                 print("Log folder:",log['folder'],"created")
             except Exception  as e:
                 print("Log folder:",log['folder'],"could not be created, error:", e)
+                sys.exit()
 
         # setup of file handler
         file_handler = logging.FileHandler(log['filepath'])     
@@ -590,10 +744,6 @@ class Logger(object):
         # check verbose flag and log it
         if self.verbose_flag:
             self.adapter.info(message)
-    
-    def __exit__(self, exc_type, exc_value, traceback):
-        for file in self.files:
-            os.unlink(file)
 
 # command line argument parser
 def args(args):
@@ -619,11 +769,11 @@ def args(args):
         required=True
     )
 
-    # conection argument parser
+    # connection argument parser
     parser.add_argument(
-        '-c','--conections',
+        '-c','--connections',
         nargs='+',
-        help='the conection parameters for dicom receivers',
+        help='the connection parameters for dicom receivers',
         default="check_string_for_empty",
         required=True
     )
@@ -651,6 +801,17 @@ def args(args):
 
     # verbose flag argument parser
     parser.add_argument(
+        '-w','--max_workers',
+        type=int,
+        help='set the maximum number of parallel \
+            processes allowed for C-STORE threads \
+            (default value is 10)',
+        default=10,
+        required=False
+    )
+
+    # verbose flag argument parser
+    parser.add_argument(
         '--verbose',
         action='store_true', 
         help='make output info more verbose \
@@ -664,21 +825,32 @@ def args(args):
     # passing filtered arguments as array
     args = parser.parse_args()
 
-    # run populate routines
-    run(args.debug, args.paths, args.conections, args.verbose)
+    '''
+        Function to run the populate main script
+
+        Arguments:
+            debug=False
+            paths=[]
+            connections=[]
+            verbose=False
+    '''
+    run(args.debug, args.paths, args.connections, args.verbose, args.max_workers)
 
 # run script function
-def run(debug=False, paths=[], conections=[], verbose=False):
+def run(debug=False, paths=[], connections=[], verbose=False, max_workers=10):
     '''
         Function to be call using library as a module on a script.py type of file
         or via terminal through the args() function
 
         Arguments:
-            debug_flag: set the debug output
-            paths: An array of paths os DICOM files
-            conections: parameters for sendind files to PACS environments
-            verbose_flag: sent the output for every file parsed
+            debug_flag: set the debug output; default=False
+            paths: An array of paths os DICOM files; default = []
+            connections: parameters for sendind files to PACS environments; default = []
+            verbose_flag: sent the output for every file parsed; default=False
     '''
+
+    # start execution timer
+    start_time = time.time()
 
     # normalizing variables
     debug_flag = debug
@@ -689,6 +861,10 @@ def run(debug=False, paths=[], conections=[], verbose=False):
 
     # standard log format
     log_format = '%(asctime)-8s %(levelname)-5s [%(project)s-%(version)s] user: %(user)s LOG: %(message)s'
+
+    # standar max_workers_permitted
+    global max_workers_permitted
+    max_workers_permitted = max_workers
 
     # creates a logger instance from class Logger within:
     # an adapter (the logging library Logger Adapter) and the verbose flag
@@ -705,6 +881,9 @@ def run(debug=False, paths=[], conections=[], verbose=False):
         verbose_flag = verbose_flag
     )
 
+    # output maximum number of threads
+    logger.adapter.debug('The maximun number of threads setted to {0}'.format(max_workers_permitted))
+
     # output log folder location
     logger.adapter.debug('Log file located at {0}'.format(log_folder))
 
@@ -717,25 +896,36 @@ def run(debug=False, paths=[], conections=[], verbose=False):
         logger.adapter.error('No paths were successfully parsed. Exiting...')
         sys.exit()
     else:
-        logger.adapter.info('Some path(s) were successfully parsed')
-        logger.adapter.debug('Path(s):{0}'.format(paths))
+        logger.adapter.info('Following path(s) were successfully parsed: {0}'.format(paths))
 
     # check validity of the paths parsed
-    conections_validator = ConectionsValidity()
-    conections = conections_validator.validate(conections)
+    connections_validator = ConnectionsValidity()
+    connections = connections_validator.validate(connections)
 
-    # check if validate conections remained
-    if not len(conections) > 0:
-        logger.adapter.error('No conections were successfully parsed. Exiting...')
+    # check if validate connections remained
+    if not len(connections) > 0:
+        logger.adapter.error('No connections were successfully parsed. Exiting...')
         sys.exit()
     else:
-        logger.adapter.info('Some conection(s) were successfully parsed')
-        logger.adapter.debug('Conection(s):{0}'.format(conections))
+        # get a valid connections array with only application entities titles
+        valid_connections = []
+        for connection in connections:
+            valid_connections.append(connection.title)
+        # log information
+        logger.adapter.info('Following connection(s) were successfully parsed: {0}'.format(valid_connections))
 
     # populate pacs servers with given folders dicom files
-    populate = Populate()
-    populate.send(paths, conections)
-    sys.exit()
+    with Populate(paths) as populate:
+        populate.send()
+
+    # get end time
+    end_time = time.time() - start_time
+
+    # format time from pure seconds to dd:hh:mm:ss
+    exec_time = datetime.timedelta(seconds=(end_time))
+
+    # log the execution time
+    logger.adapter.info('Entire process took {0}'.format(exec_time))
 
 # main function
 if __name__ == "__main__":
