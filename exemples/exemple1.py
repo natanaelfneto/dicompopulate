@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+from __future__ import *
+
 from populate import populate
 
 # get all files and paths to send

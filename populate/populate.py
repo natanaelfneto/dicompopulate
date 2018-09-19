@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import *
 
 # project name
 __project__ = "populate"
