@@ -94,10 +94,13 @@ c_2 = 'OTHER@127.0.0.1:5555'
 
 # populate
 populate.run(
-  debug=False,
+  # debug=True
+  # verbose=True
   path=[ path_1, path_2, path_3 ],
   conections=[ c_1, c_2 ]
 )
+
+
 ```
 ## License
 MIT License

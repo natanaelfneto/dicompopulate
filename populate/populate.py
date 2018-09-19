@@ -36,11 +36,18 @@ import os
 import re
 import sys
 import time
+import threading
 
+from concurrent.futures import (
+    ThreadPoolExecutor,
+    wait
+)
 from pydicom import read_file
 from pydicom.uid import ImplicitVRLittleEndian
-from pynetdicom3 import AE
-from pynetdicom3 import StoragePresentationContexts
+from pynetdicom3 import (
+    AE,
+    StoragePresentationContexts
+)
 
 '''
     In runtime there will be some global variables available
@@ -67,8 +74,17 @@ class Populate(object):
         # setup logger
         self.logger = logger.adapter
         self.verbose = logger.verbose
+
+        # internalize variables
         self.paths = paths
         self.file_counter = 0
+
+        # set initial release status
+        self.is_released = False
+        
+        # set threads variables
+        self.pool = ThreadPoolExecutor(max_workers=max_workers_permitted)
+        self.futures = []
 
     # enter class basic rotine
     def __enter__(self):
@@ -126,16 +142,12 @@ class Populate(object):
                 # try to send file through the dicom protocol within C-STORE
                 try:
                     # call C-STORE function
-                    store_status = association.store(file_path)
+                    self.futures.append(self.pool.submit(association.store, file_path))
 
-                    # check if file was successfully sent to application entity
-                    if store_status:
-                        # log successfully file transmition on verbose flag
-                        self.logger.debug("C-STORE was successfull\n")
-                        if not logger.verbose_flag:
-                            print("==>> {0} <<==".format(output), end='\r')
-                    else:
-                        self.logger.debug("{0} could not be sent\n".format(output))
+                    # log successfully file transmition on verbose flag
+                    logger.adapter.debug("C-STORE thread was successfull created")
+                    if not logger.verbose_flag:
+                        print("==>> {0} <<==".format(output), end='\r')                
 
                 # exception parser on sending file through the dicom protocol
                 except Exception as e:
@@ -171,7 +183,7 @@ class Populate(object):
 
             # else path is not a file but a directory
             else:
-                self.logger.debug('Checking for files inside directory...\n')
+                self.logger.debug('Checking for files inside directory...')
 
                 # get files inside current path
                 for root, dirs, files in os.walk(path):
@@ -179,8 +191,8 @@ class Populate(object):
 
                     if files:
                         # for each file founded
-                        for file in files:
 
+                        for file in files:
                             # get absolute path
                             file_path = os.path.abspath(os.path.join(root, file))
 
@@ -193,13 +205,20 @@ class Populate(object):
 
                 # log finishing all current path files
                 self.logger.info("Finished looking at {0}".format(path))
+                self.logger.info("Wainting for next step to finish...")
 
-            # log finishing all parsed paths
-            self.logger.info('Finished all search for files')
-            self.logger.info('A total of {0} file were sucessfully sent'.format(str(self.file_counter)))
+            # finish the instance active status
+            self.is_released = True
 
     # exit class routine
     def __exit__(self, exc_type, exc_value, traceback):
+
+        # wait for futures before releasing
+        wait(self.futures)
+
+        # wait for class instance to receive a release status
+        while not self.is_released:
+            pass    
         '''
             Function to release all application entity associations instancies
         '''
@@ -224,6 +243,10 @@ class Populate(object):
             self.logger.info("All associations successfully released")
         else:
             self.logger.info("Some associations release failed: {0}".format(associations))
+
+         # log finishing all parsed paths
+        self.logger.info('Finished all search for files')
+        self.logger.info('A total of {0} file were sucessfully sent'.format(str(self.file_counter)))
 
 # class for associations with application entities
 class Association(object):
@@ -301,15 +324,15 @@ class Association(object):
         
         # check for standarized error of association rejection 
         elif assoc.is_rejected:
-            self.logger.debug('Association was rejected by the peer')
+            self.logger.error('Association was rejected by the peer')
 
         # check for standarized error of association aborted 
         elif assoc.is_aborted:
-            self.logger.debug('Received an A-ABORT from the peer during Association')
+            self.logger.error('Received an A-ABORT from the peer during Association')
 
         # log other unkown error as well
         else:
-            self.logger.debug('No status value was received from the peer')
+            self.logger.error('No status value was received from the peer')
 
         # release the association
         self.logger.debug('Releasing {0} association'.format(self.title))
@@ -389,10 +412,7 @@ class Association(object):
         if not assoc.is_released:
             assoc.release()
             self.logger.debug('Association successfully released')
-
-        # retrieve C-STORE success bool
-        return store_status
-
+        
     # function to retrieve data from a dicom dataset
     def retrieve_dataset(self, dataset):
         '''
@@ -617,7 +637,7 @@ class ConnectionsValidity(object):
                 # else all regex parsed and connection has the minimum format
                 else:
 
-                    # output message
+                    # output messageNo
                     output = "AE: {0}, IP: {1}, PORT: {2}".format(title, addr, str(port))
 
                     # setup associations instancies
@@ -637,7 +657,7 @@ class ConnectionsValidity(object):
                             associations.append(assoc)
                             self.logger.debug('Finished C-ECHO at {0}. It was successfull'.format(output))
                         else:
-                            self.logger.debug('Finished C-ECHO at {0}. It failed'.format(output))
+                            self.logger.error('Finished C-ECHO at {0}. It failed'.format(output))
 
         # return valid parameters for application entities
         return associations
@@ -780,6 +800,18 @@ def args(args):
     )
 
     # verbose flag argument parser
+    # parser.add_argument(
+    #     '-w','--max_workers',
+    #     type=int,
+    #     help='make output info more verbose \
+    #         (it only shows output information and \
+    #         can be combined with debug flag for \
+    #         a more robust output and log)',
+    #     default=10,
+    #     required=False
+    # )
+
+    # verbose flag argument parser
     parser.add_argument(
         '--verbose',
         action='store_true', 
@@ -803,10 +835,10 @@ def args(args):
             connections=[]
             verbose=False
     '''
-    run(args.debug, args.paths, args.connections, args.verbose)
+    run(args.debug, args.paths, args.connections, args.verbose) #, args.max_workers)
 
 # run script function
-def run(debug=False, paths=[], connections=[], verbose=False):
+def run(debug=False, paths=[], connections=[], verbose=False): #, max_workers=10):
     '''
         Function to be call using library as a module on a script.py type of file
         or via terminal through the args() function
@@ -831,6 +863,11 @@ def run(debug=False, paths=[], connections=[], verbose=False):
     # standard log format
     log_format = '%(asctime)-8s %(levelname)-5s [%(project)s-%(version)s] user: %(user)s LOG: %(message)s'
 
+    # standar max_workers_permitted
+    global max_workers_permitted
+    # max_workers_permitted = max_workers
+    max_workers_permitted = 10
+
     # creates a logger instance from class Logger within:
     # an adapter (the logging library Logger Adapter) and the verbose flag
     global logger
@@ -845,6 +882,9 @@ def run(debug=False, paths=[], connections=[], verbose=False):
         },
         verbose_flag = verbose_flag
     )
+
+    # output maximum number of threads
+    logger.adapter.debug('The maximun number of threads setted to {0}'.format(max_workers_permitted))
 
     # output log folder location
     logger.adapter.debug('Log file located at {0}'.format(log_folder))
