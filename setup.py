@@ -14,6 +14,7 @@ with open(os.path.join(BASE_PATH, 'README.md'), "r") as file:
 
 install_requires = [
    'pydicom',
+   'futures'
 ]
 
 github_dependencies = {
