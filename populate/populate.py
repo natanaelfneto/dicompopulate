@@ -513,7 +513,7 @@ class Association(object):
             try:
                 temp = temp + '\n {0}: {1}'.format(data_title, getattr(dataset, data_title))
             except Exception as e:
-                self.logger.debug('Could not retrieve {0} out of {} dicom file'.format(data_title, getattr(dataset, 'StudyID')))
+                self.logger.debug('Could not retrieve {0} out of {1} dicom file'.format(data_title, getattr(dataset, 'StudyID')))
 
         # concatenate temporary output variable with formated output message
         output = 'Retrieve dicom dataset while omitting patient sensitive data \n' +\
