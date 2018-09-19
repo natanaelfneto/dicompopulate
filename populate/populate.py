@@ -800,16 +800,15 @@ def args(args):
     )
 
     # verbose flag argument parser
-    # parser.add_argument(
-    #     '-w','--max_workers',
-    #     type=int,
-    #     help='make output info more verbose \
-    #         (it only shows output information and \
-    #         can be combined with debug flag for \
-    #         a more robust output and log)',
-    #     default=10,
-    #     required=False
-    # )
+    parser.add_argument(
+        '-w','--max_workers',
+        type=int,
+        help='set the maximum number of parallel \
+            processes allowed for C-STORE threads \
+            (default value is 10)',
+        default=10,
+        required=False
+    )
 
     # verbose flag argument parser
     parser.add_argument(
@@ -835,10 +834,10 @@ def args(args):
             connections=[]
             verbose=False
     '''
-    run(args.debug, args.paths, args.connections, args.verbose) #, args.max_workers)
+    run(args.debug, args.paths, args.connections, args.verbose, args.max_workers)
 
 # run script function
-def run(debug=False, paths=[], connections=[], verbose=False): #, max_workers=10):
+def run(debug=False, paths=[], connections=[], verbose=False, max_workers=10):
     '''
         Function to be call using library as a module on a script.py type of file
         or via terminal through the args() function
@@ -865,8 +864,7 @@ def run(debug=False, paths=[], connections=[], verbose=False): #, max_workers=10
 
     # standar max_workers_permitted
     global max_workers_permitted
-    # max_workers_permitted = max_workers
-    max_workers_permitted = 10
+    max_workers_permitted = max_workers
 
     # creates a logger instance from class Logger within:
     # an adapter (the logging library Logger Adapter) and the verbose flag

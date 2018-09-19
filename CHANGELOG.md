@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 #### Added
 - process execution timer
 - send_helper() function for DRY on sending standalone files and files from folder loops
+- multithread handler for the store function
+- maximum workers value to be parsed as an optional input value from user. default is set to 10
+- workers wait function to release populate instance only when all threads were done and when release flag is set
 
 ### 0.4 - 2018-09-12
 #### Changed

@@ -12,6 +12,8 @@ c_2 = 'OTHER@127.0.0.1:5555'
 # populate
 populate.run(
   debug=True,
+  verbose=True,
+  max_workers=10,
   paths=[ path_1, path_2, path_3 ],
   conections=[ c_1, c_2 ]
 )
