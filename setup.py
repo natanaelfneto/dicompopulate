@@ -34,6 +34,8 @@ for dependency in github_dependencies:
         except Exception as e:
             print('Could not install following dependency: {0}'.format(dependency))
 
+setuptools.setup(install_requires=install_requires)
+
 # import own module
 from populate import populate as module
 
