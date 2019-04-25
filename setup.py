@@ -18,7 +18,7 @@ install_requires = [
 ]
 
 github_dependencies = {
-    'pynetdicom3': 'https://github.com/pydicom/pynetdicom3.git'
+    'pynetdicom': 'https://github.com/pydicom/pynetdicom.git'
 }
 
 # install dependencies only available on github repositories
