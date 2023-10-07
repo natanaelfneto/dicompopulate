@@ -46,7 +46,7 @@ from concurrent.futures import (
 )
 from pydicom import read_file
 from pydicom.uid import ImplicitVRLittleEndian
-from pynetdicom3 import (
+from pynetdicom import (
     AE,
     StoragePresentationContexts
 )
